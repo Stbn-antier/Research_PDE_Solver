@@ -14,3 +14,13 @@ double Shape_fct_1D::Evaluate(double coord_master, int index) {
         break;
     }
 }
+
+double Shape_fct_1D::Coordinates_deformed(double coord_master, std::vector<std::vector<double>>& coord_deformed, int index)
+{
+    // Returns the position of the x_i coordinate in the deformed element from the nodes and reference element coordinate ksi
+    double position = 0.0;
+    for (int k = 0; k < n_nodes; k++) {
+        position += coord_deformed[k][index] * Evaluate(coord_master, k);
+    }
+    return position;
+}

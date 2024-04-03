@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <fstream>
 #include <vector>
-// #include <string>
 #include "Mesh.h"
 #include "Shape_functions.h"
 #include "Shape_fct_1D.h"
@@ -31,11 +30,6 @@ const double dt = t_fin / n_time; // time step
 const double flux = 10.0; // Heat flux on left boundary
 const double t0 = 1; // Temperature imposed on right boudary
 
-const double gauss_point = 1 / sqrt(3); // Point to compute gaussian quadrature integration
-vector<double> one_d_gauss_points{
-    gauss_point, -gauss_point
-};
-
 std::vector<double> T_0(n_dof);
 
 std::vector<std::vector<double>> K(n_dof, std::vector<double>(n_dof)); // Stiffness matrix
@@ -46,7 +40,9 @@ std::vector<double> dP_previous(n_dof); // Solution vector at time t-1
 
 std::vector<std::vector<double>> C(n_dof, std::vector<double>(n_dof)); // Damping matrix for time stepping
 
+
 //---------------------------------------------
+
 
 double K_function(double x, double y) {
     // Function in the stiffness term
@@ -61,17 +57,14 @@ double f_function(double x, double y) {
     return 1.0;
 }
 
+double neumann_function(double x, double y) {
+    return 5.0;
+}
+
+
 //---------------------------------------------
 
 
-double alternate_function_neumann_bc(double coord_master, std::vector<vector<double>> coord_deformed, int ind_i, Shape_fct_1D Shape) {
-    return 5 * Shape.Evaluate(coord_master, ind_i) * abs(coord_deformed[1][0] - coord_deformed[0][0] + coord_deformed[1][1] - coord_deformed[0][1]) / 2;
-}
-
-double alternate_gauss_integral_neumann(int ind_i, std::vector<vector<double>> coord_deformed, Shape_fct_1D Shape) {
-    return alternate_function_neumann_bc(one_d_gauss_points[0], coord_deformed, ind_i, Shape)\
-        + alternate_function_neumann_bc(one_d_gauss_points[1], coord_deformed, ind_i, Shape);
-}
 
 void build_K(Mesh& Reader) {
     Volume_Inner_grad_Integral Grad_Integral;
@@ -144,7 +137,9 @@ void neumann_BC(Mesh& Reader) {
     //
     // From the mesh, assemble the neumann boundary condition as the integral on the boundary elements of dimension N-1
     //
+    Boundary_Vector_Integral Neumann_integral;
     Shape_fct_1D ShapeFct1D;
+
     for (int c = 0; c < Reader.num_Elems["line"]; c++) {
         // If for selecting the boundary on which to apply the neumann BC
         if (Reader.Nodes[Reader.Elems["line"][c].Nodes[0]][0] < 0 + 1e-10\
@@ -152,8 +147,8 @@ void neumann_BC(Mesh& Reader) {
             vector<vector<double>> coords_element;
             coords_element.push_back(Reader.Nodes[Reader.Elems["line"][c].Nodes[0]]);
             coords_element.push_back(Reader.Nodes[Reader.Elems["line"][c].Nodes[1]]);
-            F[Reader.Elems["line"][c].Nodes[0]] += alternate_gauss_integral_neumann(0, coords_element, ShapeFct1D);
-            F[Reader.Elems["line"][c].Nodes[1]] += alternate_gauss_integral_neumann(1, coords_element, ShapeFct1D);
+            F[Reader.Elems["line"][c].Nodes[0]] += Neumann_integral.Gaussian_Quadrature(0, coords_element, ShapeFct1D, neumann_function);
+            F[Reader.Elems["line"][c].Nodes[1]] += Neumann_integral.Gaussian_Quadrature(1, coords_element, ShapeFct1D, neumann_function);
             coords_element.clear();
         }
         if ((c + 1) % (Reader.num_Elems["line"] / report_step) == 0) {

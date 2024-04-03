@@ -22,7 +22,13 @@ class Boundary_Vector_Integral
 {
     //
     // Handles integral over the boundary dS with terms in a×𝜑ⱼ
+    // Used in the right-handside F terms from the natural boundary conditions
     //
+public:
+    double Evaluate_Integrand(double coord_master, std::vector<std::vector<double>>& coord_deformed,\
+        int ind_i, Shape_fct_1D& Shape, double(&f)(double, double));
+    double Gaussian_Quadrature(int ind_i, std::vector<std::vector<double>>& coord_deformed,\
+        Shape_fct_1D& Shape, double(&f)(double, double));
 };
 
 class Volume_Vector_Integral
@@ -43,6 +49,11 @@ class Boundary_Matrix_Integral
     //
     // Handles integral over the boundary dS with terms in a×𝜑ᵢ×𝜑ⱼ
     //
+public:
+    double Evaluate_Integrand(double coord_master, std::vector<std::vector<double>>& coord_deformed, \
+        int ind_i, int ind_j, Shape_fct_1D& Shape, double(&f)(double, double));
+    double Gaussian_Quadrature(int ind_i, int ind_j, std::vector<std::vector<double>>& coord_deformed, \
+        Shape_fct_1D& Shape, double(&f)(double, double));
 };
 
 class Volume_Inner_grad_Integral
