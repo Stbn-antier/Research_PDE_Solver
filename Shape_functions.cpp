@@ -22,6 +22,16 @@ double Shape_functions::Evaluate(std::vector<double> coord_master, int index) {
     }
 }
 
+double Shape_functions::Coordinates_deformed(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int index)
+{
+    // Returns the position of the x_i coordinate in the deformed element from the nodes and reference element coordinates
+    double position = 0.0;
+    for (int k = 0; k < n_nodes; k++) {
+        position += coord_deformed[k][index] * Evaluate(coord_master, k);
+    }
+    return position;
+}
+
 double Shape_functions::EvaluateDerivativeMaster(std::vector<double> coord_master, int index, int derivation_index) {
     switch (derivation_index)
     {
@@ -142,8 +152,9 @@ double Shape_functions::EvaluateDerivativeDeformed(std::vector<double> coord_mas
     return total;
 }
 
-double Shape_functions::InnerProdGrad(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int ind_i, int ind_j) {
-    return (EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_i, 0) * EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_j, 0)\
+double Shape_functions::InnerProdGrad(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int ind_i, int ind_j, double(&f)(double, double)) {
+    return f(Coordinates_deformed(coord_master, coord_deformed, 0), Coordinates_deformed(coord_master, coord_deformed, 1))\
+        * (EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_i, 0) * EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_j, 0)\
         + EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_i, 1) * EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_j, 1))\
         * abs(JacobianDeterminant(coord_master, coord_deformed));
 }

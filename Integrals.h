@@ -8,7 +8,7 @@
 class Volume_Matrix_Integral
 {
     //
-    // Handles integral over the volume dV with terms in 𝜑ᵢ×𝜑ⱼ
+    // Handles integral over the volume dV with terms in a×𝜑ᵢ×𝜑ⱼ
     // Used in the left-handside damping terms
     //
 public:
@@ -21,14 +21,14 @@ public:
 class Boundary_Vector_Integral
 {
     //
-    // Handles integral over the boundary dS with terms in 𝜑ⱼ
+    // Handles integral over the boundary dS with terms in a×𝜑ⱼ
     //
 };
 
 class Volume_Vector_Integral
 {
     //
-    // Handles integral over the volume dV with terms in 𝜑ⱼ
+    // Handles integral over the volume dV with terms in a×𝜑ⱼ
     // Used in the righthand-side source term
     //
 public:
@@ -41,6 +41,17 @@ public:
 class Boundary_Matrix_Integral
 {
     //
-    // Handles integral over the boundary dS with terms in 𝜑ᵢ×𝜑ⱼ
+    // Handles integral over the boundary dS with terms in a×𝜑ᵢ×𝜑ⱼ
     //
+};
+
+class Volume_Inner_grad_Integral
+{
+    //
+    // Handles integral over the volume dV with terms in a×∇𝜑ᵢ⋅∇𝜑ⱼ
+    // Used in the stiffness matrix
+    //
+public:
+    double Gaussian_Quadrature(int ind_i, int ind_j, std::vector<std::vector<double>>& coord_deformed,\
+        Shape_functions& Shape, double(&f)(double, double));
 };

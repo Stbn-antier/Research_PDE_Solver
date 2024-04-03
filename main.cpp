@@ -32,12 +32,6 @@ const double flux = 10.0; // Heat flux on left boundary
 const double t0 = 1; // Temperature imposed on right boudary
 
 const double gauss_point = 1 / sqrt(3); // Point to compute gaussian quadrature integration
-std::vector<vector<double>> gauss_points{
-    {-gauss_point, -gauss_point},
-    {-gauss_point, gauss_point},
-    {gauss_point, gauss_point},
-    {gauss_point, -gauss_point}
-};
 vector<double> one_d_gauss_points{
     gauss_point, -gauss_point
 };
@@ -52,17 +46,12 @@ std::vector<double> dP_previous(n_dof); // Solution vector at time t-1
 
 std::vector<std::vector<double>> C(n_dof, std::vector<double>(n_dof)); // Damping matrix for time stepping
 
-// Solving the equation KT = F with LU decomposition
-// std::vector<std::vector<double>> L(n_dof, std::vector<double>(n_dof)); // lower matrix
-// std::vector<std::vector<double>> U(n_dof, std::vector<double>(n_dof)); // upper matrix
-// std::vector<double> Z(n_dof); // auxiliary vector
-
-double gauss_integral_grad(int ind_i, int ind_j, std::vector<vector<double>> coord_deformed, Shape_functions Shape) {
-    return Shape.InnerProdGrad(gauss_points[0], coord_deformed, ind_i, ind_j) + Shape.InnerProdGrad(gauss_points[1], coord_deformed, ind_i, ind_j)\
-        + Shape.InnerProdGrad(gauss_points[2], coord_deformed, ind_i, ind_j) + Shape.InnerProdGrad(gauss_points[3], coord_deformed, ind_i, ind_j);
-}
-
 //---------------------------------------------
+
+double K_function(double x, double y) {
+    // Function in the stiffness term
+    return 1.0;
+}
 
 double C_function(double x, double y) {
     return 1.0;
@@ -85,7 +74,9 @@ double alternate_gauss_integral_neumann(int ind_i, std::vector<vector<double>> c
 }
 
 void build_K(Mesh& Reader) {
+    Volume_Inner_grad_Integral Grad_Integral;
     Shape_functions ShapeFcts;
+
     for (int c = 0; c < Reader.num_Elems["quad"]; c++) {
         // Building vector of coordinates of element
         vector<vector<double>> coords_element;
@@ -95,7 +86,7 @@ void build_K(Mesh& Reader) {
         // Assembling the stiffness matrix for element c
         for (int i = 0; i < n_sf; i++) {
             for (int j = 0; j < n_sf; j++) {
-                K[Reader.Elems["quad"][c].Nodes[i]][Reader.Elems["quad"][c].Nodes[j]] += gauss_integral_grad(i, j, coords_element, ShapeFcts);
+                K[Reader.Elems["quad"][c].Nodes[i]][Reader.Elems["quad"][c].Nodes[j]] += Grad_Integral.Gaussian_Quadrature(i, j, coords_element, ShapeFcts, K_function);
             }
         }
         coords_element.clear();
