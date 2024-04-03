@@ -1,0 +1,94 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\Mesh Handling">
+      <UniqueIdentifier>{267ea1d2-fbec-409e-80ec-916d2c1eeeac}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Mesh Handling">
+      <UniqueIdentifier>{f963fb32-7966-4b0f-b5d9-a6f01dc18229}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Shape Functions">
+      <UniqueIdentifier>{e1b6fcc0-e18f-4f3f-a758-730da7580535}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shape Functions">
+      <UniqueIdentifier>{f94c9ead-1f4c-497f-a84b-b7421b505c8d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Solve_matrix_system.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Integrals.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Mesh.cpp">
+      <Filter>Source Files\Mesh Handling</Filter>
+    </ClCompile>
+    <ClCompile Include="Element.cpp">
+      <Filter>Source Files\Mesh Handling</Filter>
+    </ClCompile>
+    <ClCompile Include="Shape_fct_1D.cpp">
+      <Filter>Source Files\Shape Functions</Filter>
+    </ClCompile>
+    <ClCompile Include="Shape_functions.cpp">
+      <Filter>Source Files\Shape Functions</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Solve_matrix_system.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Integrals.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Mesh.h">
+      <Filter>Header Files\Mesh Handling</Filter>
+    </ClInclude>
+    <ClInclude Include="Element.h">
+      <Filter>Header Files\Mesh Handling</Filter>
+    </ClInclude>
+    <ClInclude Include="Shape_fct_1D.h">
+      <Filter>Header Files\Shape Functions</Filter>
+    </ClInclude>
+    <ClInclude Include="Shape_functions.h">
+      <Filter>Header Files\Shape Functions</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="custom_mesh.msh">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="t1.msh">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="t2.msh">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="test.msh">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Research_PDE_Solver.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>
