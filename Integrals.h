@@ -5,6 +5,7 @@
 #include "Shape_functions.h"
 #include "Shape_fct_1D.h"
 
+
 class Volume_Matrix_Integral
 {
     //
@@ -14,7 +15,7 @@ class Volume_Matrix_Integral
 public:
     double Evaluate_Integrand(std::vector<double>& coord_master, std::vector<std::vector<double>>& coord_deformed,\
         int ind_i, int ind_j, Shape_functions& Shape, double (&f)(double, double));
-    double Gaussian_Quadrature(int ind_i, int ind_j, std::vector<std::vector<double>>& coord_deformed,\
+    virtual double Gaussian_Quadrature(int ind_i, int ind_j, std::vector<std::vector<double>>& coord_deformed,\
         Shape_functions& Shape, double(&f)(double, double));
 };
 
@@ -56,7 +57,7 @@ public:
         Shape_fct_1D& Shape, double(&f)(double, double));
 };
 
-class Volume_Inner_grad_Integral
+class Volume_Inner_grad_Integral : public Volume_Matrix_Integral
 {
     //
     // Handles integral over the volume dV with terms in a×∇𝜑ᵢ⋅∇𝜑ⱼ

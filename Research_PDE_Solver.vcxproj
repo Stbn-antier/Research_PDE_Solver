@@ -130,6 +130,7 @@
     <ClCompile Include="Element.cpp" />
     <ClCompile Include="Integrals.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Matrix_Assembly.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Shape_fct_1D.cpp" />
     <ClCompile Include="Shape_functions.cpp" />
@@ -138,6 +139,7 @@
   <ItemGroup>
     <ClInclude Include="Element.h" />
     <ClInclude Include="Integrals.h" />
+    <ClInclude Include="Matrix_Assembly.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Shape_fct_1D.h" />

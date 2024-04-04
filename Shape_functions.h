@@ -8,11 +8,8 @@ class Shape_functions
 private:
 public:
     int dim = 2;
-    int n_nodes=4;
-    int degree;
-
-    Shape_functions(/* args */) {};
-    ~Shape_functions() {};
+    int n_nodes=4; // Number of nodes as well as shapefunctions
+    //int degree;
 
     double Evaluate(std::vector<double> coord_master, int index);
 

@@ -9,10 +9,7 @@ private:
 public:
     int dim = 1;
     int n_nodes = 2;
-    int degree;
-
-    Shape_fct_1D() {};
-    ~Shape_fct_1D() {};
+    //int degree;
 
     double Evaluate(double coord_master, int index);
 

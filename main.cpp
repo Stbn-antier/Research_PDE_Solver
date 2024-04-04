@@ -8,6 +8,7 @@
 #include "Shape_fct_1D.h"
 #include "Solve_matrix_system.h"
 #include "Integrals.h"
+#include "Matrix_Assembly.h"
 
 using namespace std;
 
@@ -253,6 +254,8 @@ int main() {
     Mesh Reader;
     Reader.MeshReaderMSH("t1.msh");
 
+    Matrix_Builder MBuild;
+
     Solve_matrix_system Solver;
 
     // Check if version is right
@@ -270,7 +273,9 @@ int main() {
     cout << "Number of boundary elements : " << Reader.num_Elems["line"] << endl;
     cout << "Building stiffness matrix" << endl;
 
-    build_K(Reader);
+    Volume_Inner_grad_Integral IntegrateK;
+    MBuild.build_matrix(Reader, K, IntegrateK, K_function);
+    //build_K(Reader);
     // store_2d_vector_in_file("K", K);
 
     cout << "Building force vector" << endl;

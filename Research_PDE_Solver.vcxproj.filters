@@ -48,6 +48,9 @@
     <ClCompile Include="Shape_functions.cpp">
       <Filter>Source Files\Shape Functions</Filter>
     </ClCompile>
+    <ClCompile Include="Matrix_Assembly.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -70,6 +73,9 @@
     </ClInclude>
     <ClInclude Include="Shape_functions.h">
       <Filter>Header Files\Shape Functions</Filter>
+    </ClInclude>
+    <ClInclude Include="Matrix_Assembly.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
