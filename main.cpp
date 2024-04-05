@@ -31,8 +31,6 @@ const double dt = t_fin / n_time; // time step
 const double flux = 10.0; // Heat flux on left boundary
 const double t0 = 1; // Temperature imposed on right boudary
 
-std::vector<double> T_0(n_dof);
-
 std::vector<std::vector<double>> K(n_dof, std::vector<double>(n_dof)); // Stiffness matrix
 std::vector<double> F(n_dof); // Force vector
 std::vector<double> F_previous(n_dof); // Force vector
@@ -59,80 +57,35 @@ double f_function(double x, double y) {
 }
 
 double neumann_function(double x, double y) {
+    // Function in the integrand for the Neumann BC
     return 5.0;
+}
+
+double u0_fct(double x, double y, std::vector<double>& params) {
+    // Function u0 in the Dirichlet boundary condition : T=u₀ on 𝛤
+    return 1 + pow(x, 2) / 2 + pow(y, 2) + 4 * params[0];
+}
+
+double T0(std::vector<double>& coordinates) {
+    return 1 + pow(coordinates[0], 2) / 2 + pow(coordinates[1], 2);
 }
 
 
 //---------------------------------------------
 
-
-
-void build_K(Mesh& Reader) {
-    Volume_Inner_grad_Integral Grad_Integral;
-    Shape_functions ShapeFcts;
-
-    for (int c = 0; c < Reader.num_Elems["quad"]; c++) {
-        // Building vector of coordinates of element
-        vector<vector<double>> coords_element;
-        for (int k = 0; k < Reader.shapefct_per_node; k++) {
-            coords_element.push_back(Reader.Nodes[Reader.Elems["quad"][c].Nodes[k]]);
-        }
-        // Assembling the stiffness matrix for element c
-        for (int i = 0; i < n_sf; i++) {
-            for (int j = 0; j < n_sf; j++) {
-                K[Reader.Elems["quad"][c].Nodes[i]][Reader.Elems["quad"][c].Nodes[j]] += Grad_Integral.Gaussian_Quadrature(i, j, coords_element, ShapeFcts, K_function);
-            }
-        }
-        coords_element.clear();
-        if ((c + 1) % (Reader.num_Elems["quad"] / report_step) == 0) {
-            std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["quad"] << endl;
-        }
-    }
+bool left_boundary(Mesh& Reader, int index_line) {
+    // Returns TRUE if the element index is on the left boundary
+    return Reader.Nodes[Reader.Elems["line"][index_line].Nodes[0]][0] < 0 + 1e-10\
+        && Reader.Nodes[Reader.Elems["line"][index_line].Nodes[1]][0] < 0 + 1e-10;
 }
 
-void build_C(Mesh& Reader) {
-    Volume_Matrix_Integral damping;
-    Shape_functions ShapeFcts;
-
-    for (int c = 0; c < Reader.num_Elems["quad"]; c++) {
-        // Building vector of coordinates of element
-        vector<vector<double>> coords_element;
-        for (int k = 0; k < Reader.shapefct_per_node; k++) {
-            coords_element.push_back(Reader.Nodes[Reader.Elems["quad"][c].Nodes[k]]);
-        }
-        // Assembling the stiffness matrix for element c
-        for (int i = 0; i < n_sf; i++) {
-            for (int j = 0; j < n_sf; j++) {
-                C[Reader.Elems["quad"][c].Nodes[i]][Reader.Elems["quad"][c].Nodes[j]] += damping.Gaussian_Quadrature(i, j, coords_element, ShapeFcts, C_function);
-            }
-        }
-        coords_element.clear();
-        if ((c + 1) % (Reader.num_Elems["quad"] / report_step) == 0) {
-            std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["quad"] << endl;
-        }
-    }
+bool all_boundary(Mesh& Reader, int index_node) {
+    return (Reader.Nodes[index_node][0] < 0 + 1e-10 || Reader.Nodes[index_node][0] > 1 - 1e-10 || \
+        Reader.Nodes[index_node][1] < 0 + 1e-10 || Reader.Nodes[index_node][1] > 1 - 1e-10);
 }
 
-void build_F(Mesh& Reader) {
-    Volume_Vector_Integral F_integral;
-    Shape_functions ShapeFcts;
+//---------------------------------------------
 
-    for (int c = 0; c < Reader.num_Elems["quad"]; c++) {
-        // Building vector of coordinates of element
-        vector<vector<double>> coords_element;
-        for (int k = 0; k < Reader.shapefct_per_node; k++) {
-            coords_element.push_back(Reader.Nodes[Reader.Elems["quad"][c].Nodes[k]]);
-        }
-        // Assembling the force vector for element c
-        for (int i = 0; i < n_sf; i++) {
-            F[Reader.Elems["quad"][c].Nodes[i]] += F_integral.Gaussian_Quadrature(i, coords_element, ShapeFcts, f_function);
-        }
-        coords_element.clear();
-        if ((c + 1) % (Reader.num_Elems["quad"] / report_step) == 0) {
-            std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["quad"] << endl;
-        }
-    }
-}
 
 void neumann_BC(Mesh& Reader) {
     //
@@ -158,58 +111,6 @@ void neumann_BC(Mesh& Reader) {
     }
 }
 
-void dirichlet_BC(Mesh& Reader, double time, std::vector<std::vector<double>>& A_matrix, std::vector<double>& b_vector) {
-    // Setting on the boundaries based on constant
-    // for (int k=0; k < n_dof; k++){
-    //     // if (Reader.Nodes[k][0] < 0 + 1e-10){
-    //     //     T_0[k] = 2.0;
-    //     // }
-    //     if (Reader.Nodes[k][0] > 1 - 1e-10){
-    //         T_0[k] = 1.0;
-    //     }
-    // }
-
-    // Setting on boundaries based on expression
-    for (int k = 0; k < n_dof; k++) {
-        if ((Reader.Nodes[k][0] < 0 + 1e-10 || Reader.Nodes[k][0] > 1 - 1e-10 || \
-            Reader.Nodes[k][1] < 0 + 1e-10 || Reader.Nodes[k][1] > 1 - 1e-10)) {
-            T_0[k] = 1 + pow(Reader.Nodes[k][0], 2) / 2 + pow(Reader.Nodes[k][1], 2) + 4 * time;
-        }
-    }
-
-    for (int k = 0; k < n_dof; k++) {
-        // Remove K*T₀ from the F vector
-        for (int i = 0; i < n_dof; i++) {
-            b_vector[k] -= A_matrix[k][i] * T_0[i];
-        }
-    }
-
-    for (int k = 0; k < n_dof; k++) {
-        // If the dof is on the boundary, impose the temperature
-        // and reset the corresponding row and column of K
-        if (T_0[k] != 0.0) {
-            b_vector[k] = T_0[k];
-
-            A_matrix[k][k] = 1;
-            for (int l = 0; l < n_dof; l++) {
-                if (l != k) {
-                    A_matrix[k][l] = 0.0;
-                    A_matrix[l][k] = 0.0;
-                }
-            }
-        }
-    }
-}
-
-double Set_Initial_T(std::vector<double> coordinates) {
-    return 1 + pow(coordinates[0], 2) / 2 + pow(coordinates[1], 2);
-}
-
-void build_T0(Mesh& Reader) {
-    for (int k = 0; k < n_dof; k++) {
-        dP_previous[k] = Set_Initial_T(Reader.Nodes[k]);
-    }
-}
 
 void build_A_matrix(std::vector<std::vector<double>>& A_matrix) {
     for (int i = 0; i < n_dof; i++) {
@@ -275,11 +176,10 @@ int main() {
 
     Volume_Inner_grad_Integral IntegrateK;
     MBuild.build_matrix(Reader, K, IntegrateK, K_function);
-    //build_K(Reader);
-    // store_2d_vector_in_file("K", K);
 
     cout << "Building force vector" << endl;
-    build_F(Reader);
+    Volume_Vector_Integral IntegrateF;
+    MBuild.build_vector(Reader, F, IntegrateF, f_function);
     // Put F into previous F vector
     std::copy(F.begin(), F.end(), F_previous.begin());
 
@@ -288,7 +188,7 @@ int main() {
 
     store_1d_vector_in_file("F", F);
 
-    cout << "Imposing Dirichlet BC" << endl;
+    // cout << "Imposing Dirichlet BC" << endl;
     // dirichlet_BC(Reader, 0, K, F);
 
     // Reset F vector before next time step
@@ -297,12 +197,14 @@ int main() {
     // For time dependent problems
     // Precomputing the constant matrices C and K
     cout << "Computing damping matrix" << endl;
-    build_C(Reader);
+    Volume_Matrix_Integral IntegrateC;
+    MBuild.build_matrix(Reader, C, IntegrateC, C_function);
+
     store_2d_vector_in_file("C", C);
     store_2d_vector_in_file("K", K);
 
     // First, we calculate the initial condition at t=0
-    build_T0(Reader);
+    MBuild.build_initial_T(Reader, dP_previous, T0);
     store_1d_vector_in_file("result_t_0", dP_previous);
 
     // // Then we loop on each timestep
@@ -311,12 +213,15 @@ int main() {
         std::vector<std::vector<double>> A_matrix(n_dof, std::vector<double>(n_dof));
         std::vector<double> b_vector(n_dof);
 
-        std::fill(T_0.begin(), T_0.end(), 0.0);
-        build_F(Reader);
+        MBuild.build_vector(Reader, F, IntegrateF, f_function);
 
         build_A_matrix(A_matrix);
         build_b_vector(b_vector);
-        dirichlet_BC(Reader, t, A_matrix, b_vector);
+
+        std::vector<double> params_dirichlet = {t};
+        MBuild.dirichlet_BC(Reader, A_matrix, b_vector, u0_fct, params_dirichlet, all_boundary);
+        params_dirichlet.clear();
+
         Solver.solve_system(A_matrix, b_vector, dP);
         store_1d_vector_in_file("b", b_vector);
         store_2d_vector_in_file("A", A_matrix);
@@ -324,7 +229,6 @@ int main() {
 
         A_matrix.clear();
         b_vector.clear();
-        store_1d_vector_in_file("T", T_0);
 
         store_1d_vector_in_file("result_t_" + to_string(t), dP);
         dP_previous.swap(dP);

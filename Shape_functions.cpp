@@ -152,7 +152,7 @@ double Shape_functions::EvaluateDerivativeDeformed(std::vector<double> coord_mas
     return total;
 }
 
-double Shape_functions::InnerProdGrad(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int ind_i, int ind_j, double(&f)(double, double)) {
+double Shape_functions::InnerProdGrad(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int ind_i, int ind_j, integrand_function f) {
     return f(Coordinates_deformed(coord_master, coord_deformed, 0), Coordinates_deformed(coord_master, coord_deformed, 1))\
         * (EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_i, 0) * EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_j, 0)\
         + EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_i, 1) * EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_j, 1))\

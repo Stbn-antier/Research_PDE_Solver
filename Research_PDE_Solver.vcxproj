@@ -138,6 +138,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Element.h" />
+    <ClInclude Include="Aliases.h" />
     <ClInclude Include="Integrals.h" />
     <ClInclude Include="Matrix_Assembly.h" />
     <ClInclude Include="Mesh.h" />

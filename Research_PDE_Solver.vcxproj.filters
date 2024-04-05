@@ -77,6 +77,9 @@
     <ClInclude Include="Matrix_Assembly.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Aliases.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="custom_mesh.msh">

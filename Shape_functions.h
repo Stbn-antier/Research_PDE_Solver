@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include "Aliases.h"
 
 class Shape_functions
 {
@@ -25,7 +26,7 @@ public:
 
     double JacobianInvert(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int line, int column);
 
-    double InnerProdGrad(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int ind_i, int ind_j, double(&f)(double, double));
+    double InnerProdGrad(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int ind_i, int ind_j, integrand_function f);
 
     double NormJacobianTNormal(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int normal_n);
 };
