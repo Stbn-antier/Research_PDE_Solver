@@ -56,6 +56,7 @@ double Boundary_Vector_Integral::Evaluate_Integrand(double coord_master, std::ve
 {
 	return f(Shape.Coordinates_deformed(coord_master, coord_deformed, 0), Shape.Coordinates_deformed(coord_master, coord_deformed, 1))\
 		* Shape.Evaluate(coord_master, ind_i)\
+		//* abs(coord_deformed[1][0] - coord_deformed[0][0] + coord_deformed[1][1] - coord_deformed[0][1]) / 2;
 		* sqrt(pow(coord_deformed[1][0] - coord_deformed[0][0], 2) + pow(coord_deformed[1][1] - coord_deformed[0][1], 2)) / 2;
 }
 

@@ -55,7 +55,7 @@ void Matrix_Builder::dirichlet_BC(Mesh& Reader, std::vector<std::vector<double>>
     std::vector<double>& b_vector, dirichlet_u0 u0_fct, std::vector<double>& u0_params, on_boundary on_bound)
 {
 
-    std::vector<double> T_0(Reader.num_nodes);
+    std::vector<double> T_0(Reader.num_nodes, 0.0);
 
     // Setting on boundaries based on expression
     for (int k = 0; k < Reader.num_nodes; k++) {
@@ -88,6 +88,29 @@ void Matrix_Builder::dirichlet_BC(Mesh& Reader, std::vector<std::vector<double>>
     }
 
     T_0.clear();
+}
+
+void Matrix_Builder::neumann_BC(Mesh& Reader, std::vector<double>& f_vector, Boundary_Vector_Integral Integral, integrand_function f, on_boundary on_bound)
+{
+    //
+    // From the mesh, assemble the neumann boundary condition as the integral on the boundary elements of dimension N-1
+    //
+    Shape_fct_1D ShapeFct1D;
+
+    for (int c = 0; c < Reader.num_Elems["line"]; c++) {
+        // If for selecting the boundary on which to apply the neumann BC
+        if (on_bound(Reader, c)) {
+            vector<vector<double>> coords_element;
+            coords_element.push_back(Reader.Nodes[Reader.Elems["line"][c].Nodes[0]]);
+            coords_element.push_back(Reader.Nodes[Reader.Elems["line"][c].Nodes[1]]);
+            f_vector[Reader.Elems["line"][c].Nodes[0]] += Integral.Gaussian_Quadrature(0, coords_element, ShapeFct1D, f);
+            f_vector[Reader.Elems["line"][c].Nodes[1]] += Integral.Gaussian_Quadrature(1, coords_element, ShapeFct1D, f);
+            coords_element.clear();
+        }
+        if ((c + 1) % (Reader.num_Elems["line"] / report_steps) == 0) {
+            std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["line"] << endl;
+        }
+    }
 }
 
 void Matrix_Builder::build_initial_T(Mesh& Reader, std::vector<double>& vect_T0, initial_T0 T0_fct)

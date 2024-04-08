@@ -21,6 +21,9 @@ public:
 	void dirichlet_BC(Mesh& Reader, std::vector<std::vector<double>>& A_matrix, \
 		std::vector<double>& b_vector, dirichlet_u0 u0_fct, std::vector<double>& u0_params, on_boundary on_bound);
 
+	void neumann_BC(Mesh& Reader, std::vector<double>& f_vector, Boundary_Vector_Integral Integral, \
+		integrand_function f, on_boundary on_bound);
+
 	void build_initial_T(Mesh& Reader, std::vector<double>& vect_T0, initial_T0 T0_fct);
 
 	void build_A_matrix();

@@ -43,73 +43,75 @@ std::vector<std::vector<double>> C(n_dof, std::vector<double>(n_dof)); // Dampin
 //---------------------------------------------
 
 
-double K_function(double x, double y) {
+static double K_function(double x, double y) {
     // Function in the stiffness term
     return 1.0;
 }
 
-double C_function(double x, double y) {
+static double C_function(double x, double y) {
     return 1.0;
 }
 
-double f_function(double x, double y) {
-    return 1.0;
+static double f_function(double x, double y) {
+    return 2.0;
 }
 
-double neumann_function(double x, double y) {
+static double neumann_fct(double x, double y) {
     // Function in the integrand for the Neumann BC
     return 5.0;
 }
 
-double u0_fct(double x, double y, std::vector<double>& params) {
+static double u0_fct(double x, double y, std::vector<double>& params) {
     // Function u0 in the Dirichlet boundary condition : T=u₀ on 𝛤
-    return 1 + pow(x, 2) / 2 + pow(y, 2) + 4 * params[0];
+    //return 1 + pow(x, 2) / 2 + pow(y, 2) + 4 * params[0];
+    return 5*(x-1) + 1 + 2 * params[0];
 }
 
-double T0(std::vector<double>& coordinates) {
-    return 1 + pow(coordinates[0], 2) / 2 + pow(coordinates[1], 2);
+static double T0(std::vector<double>& coordinates) {
+    //return 1 + pow(coordinates[0], 2) / 2 + pow(coordinates[1], 2);
+    return 5*(1-coordinates[0]) + 1;
 }
 
 
 //---------------------------------------------
 
-bool left_boundary(Mesh& Reader, int index_line) {
-    // Returns TRUE if the element index is on the left boundary
+static bool left_boundary(Mesh& Reader, int index_line) {
+    // Returns TRUE if the LINE element at index index_line is on the left boundary
     return Reader.Nodes[Reader.Elems["line"][index_line].Nodes[0]][0] < 0 + 1e-10\
         && Reader.Nodes[Reader.Elems["line"][index_line].Nodes[1]][0] < 0 + 1e-10;
 }
 
-bool all_boundary(Mesh& Reader, int index_node) {
+static bool right_boundary(Mesh& Reader, int index_line) {
+    // Returns TRUE if the LINE element at index index_line is on the right boundary
+    return Reader.Nodes[Reader.Elems["line"][index_line].Nodes[0]][0] > 1 - 1e-10\
+        && Reader.Nodes[Reader.Elems["line"][index_line].Nodes[1]][0] > 1 - 1e-10;
+}
+
+static bool bottom_boundary(Mesh& Reader, int index_line) {
+    // Returns TRUE if the LINE element at index index_line is on the bottom boundary
+    return Reader.Nodes[Reader.Elems["line"][index_line].Nodes[0]][1] < 0 + 1e-10\
+        && Reader.Nodes[Reader.Elems["line"][index_line].Nodes[1]][1] < 0 + 1e-10;
+}
+
+static bool top_boundary(Mesh& Reader, int index_line) {
+    // Returns TRUE if the LINE element at index index_line is on the top boundary
+    return Reader.Nodes[Reader.Elems["line"][index_line].Nodes[0]][1] > 1 - 1e-10\
+        && Reader.Nodes[Reader.Elems["line"][index_line].Nodes[1]][1] > 1 - 1e-10;
+}
+
+static bool all_boundary(Mesh& Reader, int index_node) {
+    // Returns TRUE if the NODE at index index_node in on a boundary of the domain
     return (Reader.Nodes[index_node][0] < 0 + 1e-10 || Reader.Nodes[index_node][0] > 1 - 1e-10 || \
         Reader.Nodes[index_node][1] < 0 + 1e-10 || Reader.Nodes[index_node][1] > 1 - 1e-10);
 }
 
-//---------------------------------------------
-
-
-void neumann_BC(Mesh& Reader) {
-    //
-    // From the mesh, assemble the neumann boundary condition as the integral on the boundary elements of dimension N-1
-    //
-    Boundary_Vector_Integral Neumann_integral;
-    Shape_fct_1D ShapeFct1D;
-
-    for (int c = 0; c < Reader.num_Elems["line"]; c++) {
-        // If for selecting the boundary on which to apply the neumann BC
-        if (Reader.Nodes[Reader.Elems["line"][c].Nodes[0]][0] < 0 + 1e-10\
-            && Reader.Nodes[Reader.Elems["line"][c].Nodes[1]][0] < 0 + 1e-10) {
-            vector<vector<double>> coords_element;
-            coords_element.push_back(Reader.Nodes[Reader.Elems["line"][c].Nodes[0]]);
-            coords_element.push_back(Reader.Nodes[Reader.Elems["line"][c].Nodes[1]]);
-            F[Reader.Elems["line"][c].Nodes[0]] += Neumann_integral.Gaussian_Quadrature(0, coords_element, ShapeFct1D, neumann_function);
-            F[Reader.Elems["line"][c].Nodes[1]] += Neumann_integral.Gaussian_Quadrature(1, coords_element, ShapeFct1D, neumann_function);
-            coords_element.clear();
-        }
-        if ((c + 1) % (Reader.num_Elems["line"] / report_step) == 0) {
-            std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["line"] << endl;
-        }
-    }
+static bool left_boundary_node(Mesh& Reader, int index_node) {
+    // Returns TRUE if the NODE at index index_node in on a boundary of the domain
+    //return (Reader.Nodes[index_node][0] < 0 + 1e-10 || Reader.Nodes[index_node][1] < 0 + 1e-10);
+    return Reader.Nodes[index_node][0] > 1 - 1e-10;
 }
+
+//---------------------------------------------
 
 
 void build_A_matrix(std::vector<std::vector<double>>& A_matrix) {
@@ -133,7 +135,7 @@ void build_b_vector(std::vector<double>& b_vector) {
 void store_1d_vector_in_file(std::string filename, vector<double>& array_to_store) {
     ofstream myfile;
     myfile.open("results/" + filename + ".txt");
-    for (int i = 0; i < n_dof; i++) {
+    for (int i = 0; i < array_to_store.size(); i++) {
         myfile << array_to_store[i] << endl;
     }
     myfile.close();
@@ -215,11 +217,21 @@ int main() {
 
         MBuild.build_vector(Reader, F, IntegrateF, f_function);
 
+        
+
         build_A_matrix(A_matrix);
         build_b_vector(b_vector);
 
+        // Neumann boundary imposition
+        Boundary_Vector_Integral Neumann_integrator;
+        //neumann_BC(Reader, F, Neumann_integrator, neumann_one, right_boundary);
+        //neumann_BC(Reader, F, Neumann_integrator, neumann_two, top_boundary);
+        MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, neumann_fct, left_boundary);
+        store_1d_vector_in_file("F", F);
+
+        // Dirichlet boundary imposition
         std::vector<double> params_dirichlet = {t};
-        MBuild.dirichlet_BC(Reader, A_matrix, b_vector, u0_fct, params_dirichlet, all_boundary);
+        MBuild.dirichlet_BC(Reader, A_matrix, b_vector, u0_fct, params_dirichlet, left_boundary_node);
         params_dirichlet.clear();
 
         Solver.solve_system(A_matrix, b_vector, dP);
