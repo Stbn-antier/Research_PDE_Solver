@@ -53,23 +53,26 @@ static double C_function(double x, double y) {
 }
 
 static double f_function(double x, double y) {
-    return 2.0;
+    return 1.0;
 }
 
-static double neumann_fct(double x, double y) {
+static double neumann_one(double x, double y) {
     // Function in the integrand for the Neumann BC
-    return 5.0;
+    return 1.0;
+}
+
+static double neumann_two(double x, double y) {
+    // Function in the integrand for the Neumann BC
+    return 2.0;
 }
 
 static double u0_fct(double x, double y, std::vector<double>& params) {
     // Function u0 in the Dirichlet boundary condition : T=u₀ on 𝛤
-    //return 1 + pow(x, 2) / 2 + pow(y, 2) + 4 * params[0];
-    return 5*(x-1) + 1 + 2 * params[0];
+    return 1 + pow(x, 2) / 2 + pow(y, 2) + 4 * params[0];
 }
 
 static double T0(std::vector<double>& coordinates) {
-    //return 1 + pow(coordinates[0], 2) / 2 + pow(coordinates[1], 2);
-    return 5*(1-coordinates[0]) + 1;
+    return 1 + pow(coordinates[0], 2) / 2 + pow(coordinates[1], 2);
 }
 
 
@@ -107,8 +110,7 @@ static bool all_boundary(Mesh& Reader, int index_node) {
 
 static bool left_boundary_node(Mesh& Reader, int index_node) {
     // Returns TRUE if the NODE at index index_node in on a boundary of the domain
-    //return (Reader.Nodes[index_node][0] < 0 + 1e-10 || Reader.Nodes[index_node][1] < 0 + 1e-10);
-    return Reader.Nodes[index_node][0] > 1 - 1e-10;
+    return (Reader.Nodes[index_node][0] < 0 + 1e-10 || Reader.Nodes[index_node][1] < 0 + 1e-10);
 }
 
 //---------------------------------------------
@@ -185,13 +187,8 @@ int main() {
     // Put F into previous F vector
     std::copy(F.begin(), F.end(), F_previous.begin());
 
-    // cout << "Imposing Neumann BC" << endl;
-    // neumann_BC(Reader);
 
     store_1d_vector_in_file("F", F);
-
-    // cout << "Imposing Dirichlet BC" << endl;
-    // dirichlet_BC(Reader, 0, K, F);
 
     // Reset F vector before next time step
     std::fill(F.begin(), F.end(), 0.0);
@@ -224,15 +221,14 @@ int main() {
 
         // Neumann boundary imposition
         Boundary_Vector_Integral Neumann_integrator;
-        //neumann_BC(Reader, F, Neumann_integrator, neumann_one, right_boundary);
-        //neumann_BC(Reader, F, Neumann_integrator, neumann_two, top_boundary);
-        MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, neumann_fct, left_boundary);
+        MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, neumann_one, right_boundary);
+        MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, neumann_two, top_boundary);
         store_1d_vector_in_file("F", F);
 
         // Dirichlet boundary imposition
-        std::vector<double> params_dirichlet = {t};
+        /*std::vector<double> params_dirichlet = {t};
         MBuild.dirichlet_BC(Reader, A_matrix, b_vector, u0_fct, params_dirichlet, left_boundary_node);
-        params_dirichlet.clear();
+        params_dirichlet.clear();*/
 
         Solver.solve_system(A_matrix, b_vector, dP);
         store_1d_vector_in_file("b", b_vector);
