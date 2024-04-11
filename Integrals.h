@@ -28,9 +28,9 @@ class Boundary_Vector_Integral
     //
 public:
     double Evaluate_Integrand(double coord_master, std::vector<std::vector<double>>& coord_deformed,\
-        int ind_i, Shape_fct_1D& Shape, integrand_function f);
+        int ind_i, Shape_fct_1D& Shape, boundary_integrand f, std::vector<double>& params);
     double Gaussian_Quadrature(int ind_i, std::vector<std::vector<double>>& coord_deformed,\
-        Shape_fct_1D& Shape, integrand_function f);
+        Shape_fct_1D& Shape, boundary_integrand f, std::vector<double>& params);
 };
 
 class Volume_Vector_Integral
@@ -53,9 +53,9 @@ class Boundary_Matrix_Integral
     //
 public:
     double Evaluate_Integrand(double coord_master, std::vector<std::vector<double>>& coord_deformed, \
-        int ind_i, int ind_j, Shape_fct_1D& Shape, integrand_function f);
+        int ind_i, int ind_j, Shape_fct_1D& Shape, boundary_integrand f, std::vector<double>& params);
     double Gaussian_Quadrature(int ind_i, int ind_j, std::vector<std::vector<double>>& coord_deformed, \
-        Shape_fct_1D& Shape, integrand_function f);
+        Shape_fct_1D& Shape, boundary_integrand f, std::vector<double>& params);
 };
 
 class Volume_Inner_grad_Integral : public Volume_Matrix_Integral

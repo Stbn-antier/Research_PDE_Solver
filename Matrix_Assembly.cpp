@@ -90,7 +90,7 @@ void Matrix_Builder::dirichlet_BC(Mesh& Reader, std::vector<std::vector<double>>
     T_0.clear();
 }
 
-void Matrix_Builder::neumann_BC(Mesh& Reader, std::vector<double>& f_vector, Boundary_Vector_Integral Integral, integrand_function f, on_boundary on_bound)
+void Matrix_Builder::neumann_BC(Mesh& Reader, std::vector<double>& f_vector, Boundary_Vector_Integral Integral, boundary_integrand f, on_boundary on_bound, std::vector<double>& params)
 {
     //
     // From the mesh, assemble the neumann boundary condition as the integral on the boundary elements of dimension N-1
@@ -103,8 +103,42 @@ void Matrix_Builder::neumann_BC(Mesh& Reader, std::vector<double>& f_vector, Bou
             vector<vector<double>> coords_element;
             coords_element.push_back(Reader.Nodes[Reader.Elems["line"][c].Nodes[0]]);
             coords_element.push_back(Reader.Nodes[Reader.Elems["line"][c].Nodes[1]]);
-            f_vector[Reader.Elems["line"][c].Nodes[0]] += Integral.Gaussian_Quadrature(0, coords_element, ShapeFct1D, f);
-            f_vector[Reader.Elems["line"][c].Nodes[1]] += Integral.Gaussian_Quadrature(1, coords_element, ShapeFct1D, f);
+            f_vector[Reader.Elems["line"][c].Nodes[0]] += Integral.Gaussian_Quadrature(0, coords_element, ShapeFct1D, f, params);
+            f_vector[Reader.Elems["line"][c].Nodes[1]] += Integral.Gaussian_Quadrature(1, coords_element, ShapeFct1D, f, params);
+            coords_element.clear();
+        }
+        if ((c + 1) % (Reader.num_Elems["line"] / report_steps) == 0) {
+            std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["line"] << endl;
+        }
+    }
+}
+
+void Matrix_Builder::robin_BC(Mesh& Reader, std::vector<double>& f_vector, std::vector<std::vector<double>>& G_matrix, \
+    Boundary_Vector_Integral Vect_integral, Boundary_Matrix_Integral Mat_integral, \
+    boundary_integrand f_vect, boundary_integrand f_mat, on_boundary on_bound, std::vector<double>& params)
+{
+    //
+    // From the mesh, assemble the Robin boundary condition as the integral on the boundary elements of dimension N-1
+    // f_mat and f_vect are the integrand, respectively for the right-handside and left-handside terms
+    //
+    Shape_fct_1D ShapeFct1D;
+
+    for (int c = 0; c < Reader.num_Elems["line"]; c++) {
+        // If for selecting the boundary on which to apply the neumann BC
+        if (on_bound(Reader, c)) {
+            vector<vector<double>> coords_element;
+            coords_element.push_back(Reader.Nodes[Reader.Elems["line"][c].Nodes[0]]);
+            coords_element.push_back(Reader.Nodes[Reader.Elems["line"][c].Nodes[1]]);
+            f_vector[Reader.Elems["line"][c].Nodes[0]] += Vect_integral.Gaussian_Quadrature(0, coords_element, ShapeFct1D, f_vect, params);
+            f_vector[Reader.Elems["line"][c].Nodes[1]] += Vect_integral.Gaussian_Quadrature(1, coords_element, ShapeFct1D, f_vect, params);
+            
+
+            for (int i = 0; i < 2; i++) {
+                for (int j = 0; j < 2; j++) {
+                    G_matrix[Reader.Elems["line"][c].Nodes[i]][Reader.Elems["line"][c].Nodes[j]] += Mat_integral.Gaussian_Quadrature(i, j, coords_element, ShapeFct1D, f_mat, params);
+                }
+            }
+
             coords_element.clear();
         }
         if ((c + 1) % (Reader.num_Elems["line"] / report_steps) == 0) {

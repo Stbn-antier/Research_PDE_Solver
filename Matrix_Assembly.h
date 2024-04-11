@@ -22,7 +22,11 @@ public:
 		std::vector<double>& b_vector, dirichlet_u0 u0_fct, std::vector<double>& u0_params, on_boundary on_bound);
 
 	void neumann_BC(Mesh& Reader, std::vector<double>& f_vector, Boundary_Vector_Integral Integral, \
-		integrand_function f, on_boundary on_bound);
+		boundary_integrand f, on_boundary on_bound, std::vector<double>& params);
+
+	void robin_BC(Mesh& Reader, std::vector<double>& f_vector, std::vector<std::vector<double>>& G_matrix, \
+		Boundary_Vector_Integral Vect_integral,	Boundary_Matrix_Integral Mat_integral, \
+		boundary_integrand f_vect, boundary_integrand f_mat, on_boundary on_bound, std::vector<double>& params);
 
 	void build_initial_T(Mesh& Reader, std::vector<double>& vect_T0, initial_T0 T0_fct);
 

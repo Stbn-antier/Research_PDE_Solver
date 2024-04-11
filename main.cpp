@@ -28,9 +28,6 @@ const double t_fin = 10; // Final time of simulation
 const double n_time = 10; // Number of time steps not including t=0
 const double dt = t_fin / n_time; // time step
 
-const double flux = 10.0; // Heat flux on left boundary
-const double t0 = 1; // Temperature imposed on right boudary
-
 std::vector<std::vector<double>> K(n_dof, std::vector<double>(n_dof)); // Stiffness matrix
 std::vector<double> F(n_dof); // Force vector
 std::vector<double> F_previous(n_dof); // Force vector
@@ -39,40 +36,60 @@ std::vector<double> dP_previous(n_dof); // Solution vector at time t-1
 
 std::vector<std::vector<double>> C(n_dof, std::vector<double>(n_dof)); // Damping matrix for time stepping
 
+//---------------------------------------------
+// Constants for the different functions
+
+const double k_iso = 50; // Heat transfer coefficient in W/m²
+const double rho = 1; // Density of the material in kg/m^3
+const double Cp = 500; // Heat capacity in J/(kg.K)
+const double q_coef = 5000; // Inward heat flux in W/m²
+const double T_ext = 200; // Outside temperature in K
+const double T_0 = 300; // Initial temperature in K
+
+const double h_coef = 10; // Heat transfer coefficient for the right boundary in W/(m².K)
 
 //---------------------------------------------
 
 
 static double K_function(double x, double y) {
     // Function in the stiffness term
-    return 1.0;
+    return k_iso;
 }
 
 static double C_function(double x, double y) {
-    return 1.0;
+    return rho*Cp;
 }
 
 static double f_function(double x, double y) {
-    return 1.0;
+    // No source terms
+    return 0.0;
 }
 
-static double neumann_one(double x, double y) {
+static double neumann_BC_fct(double x, double y, std::vector<double>& params) {
     // Function in the integrand for the Neumann BC
-    return 1.0;
+    if (y < 0.7 && y > 0.3 && params[0] >= 3) {
+        return q_coef;
+    };
+    return 0;
 }
 
-static double neumann_two(double x, double y) {
+static double Robin_BC_vect_fct(double x, double y, std::vector<double>& params) {
     // Function in the integrand for the Neumann BC
-    return 2.0;
+    return h_coef * T_ext;
 }
 
-static double u0_fct(double x, double y, std::vector<double>& params) {
-    // Function u0 in the Dirichlet boundary condition : T=u₀ on 𝛤
-    return 1 + pow(x, 2) / 2 + pow(y, 2) + 4 * params[0];
+static double Robin_BC_mat_fct(double x, double y, std::vector<double>& params) {
+    // No source terms
+    return h_coef;
 }
+
+//static double u0_fct(double x, double y, std::vector<double>& params) {
+//    // Function u0 in the Dirichlet boundary condition : T=u₀ on 𝛤
+//    return 1 + pow(x, 2) / 2 + pow(y, 2) + 4 * params[0];
+//}
 
 static double T0(std::vector<double>& coordinates) {
-    return 1 + pow(coordinates[0], 2) / 2 + pow(coordinates[1], 2);
+    return T_0;
 }
 
 
@@ -209,8 +226,10 @@ int main() {
     // // Then we loop on each timestep
     for (int i = 0; i < n_time; i++) {
         double t = (i + 1) * dt;
+        cout << "Timestep t = " << t << endl;
         std::vector<std::vector<double>> A_matrix(n_dof, std::vector<double>(n_dof));
         std::vector<double> b_vector(n_dof);
+        std::vector<double> params_for_fct = { t };
 
         MBuild.build_vector(Reader, F, IntegrateF, f_function);
 
@@ -220,15 +239,20 @@ int main() {
         build_b_vector(b_vector);
 
         // Neumann boundary imposition
+        cout << "Neumann BC ";
         Boundary_Vector_Integral Neumann_integrator;
-        MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, neumann_one, right_boundary);
-        MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, neumann_two, top_boundary);
+        MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, neumann_BC_fct, left_boundary, params_for_fct);
         store_1d_vector_in_file("F", F);
 
+        // Robin boundary imposition
+        cout << "Robin BC ";
+        Boundary_Matrix_Integral Robin_integrator;
+        MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, Robin_BC_vect_fct, Robin_BC_mat_fct, right_boundary, params_for_fct);
+
         // Dirichlet boundary imposition
-        /*std::vector<double> params_dirichlet = {t};
-        MBuild.dirichlet_BC(Reader, A_matrix, b_vector, u0_fct, params_dirichlet, left_boundary_node);
-        params_dirichlet.clear();*/
+        //MBuild.dirichlet_BC(Reader, A_matrix, b_vector, u0_fct, params_dirichlet, left_boundary_node);
+
+        params_for_fct.clear();
 
         Solver.solve_system(A_matrix, b_vector, dP);
         store_1d_vector_in_file("b", b_vector);
@@ -243,12 +267,5 @@ int main() {
         F_previous.swap(F);
         std::fill(F.begin(), F.end(), 0.0);
     }
-
-    // cout << "Solving system" << endl;
-    // solve_system(K, F);
-
-    // store_1d_vector_in_file("Results", dP);
-
-    // store_1d_vector_in_file("T", T_0);
     return 0;
 };

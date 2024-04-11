@@ -7,6 +7,10 @@
 // Parameters are (x, y)
 using integrand_function = double(&)(double, double);
 
+// Alias for the function a used in integrand like ∫a(...)*f(𝜑ᵢ,𝜑ⱼ,...)d𝛺
+// Parameters are (x, y)
+using boundary_integrand = double(&)(double, double, std::vector<double>&);
+
 
 // Alias for the function used in Dirichlet boundary conditions u₀
 // Parameters are (x, y, t)
