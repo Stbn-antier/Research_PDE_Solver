@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <fstream>
 #include <vector>
+#include <random>
 #include "Mesh.h"
 #include "Shape_functions.h"
 #include "Shape_fct_1D.h"
@@ -18,14 +19,14 @@ const int n_width = 2; // Number of elements in x direction <-->
 const int n_height = 2; // Number of elements in y direction ^|v 
 int n_elem = 464;
 const int n_sf = 4; // Number of shape function per element
-const int n_dof = 143; // Number of nodes | à modifier à chaque fois
+const int n_dof = 505; // Number of nodes | à modifier à chaque fois, 505 pour t2, 143 pour t1
 const double hw = 1 / width;
 const double hh = 1 / height; // Finite element height&width
 
 const int report_step = 1; // Report progress at every 1/report_step % of progress
 
 const double t_fin = 10; // Final time of simulation
-const double n_time = 10; // Number of time steps not including t=0
+const double n_time = 50; // Number of time steps not including t=0
 const double dt = t_fin / n_time; // time step
 
 std::vector<std::vector<double>> K(n_dof, std::vector<double>(n_dof)); // Stiffness matrix
@@ -46,7 +47,21 @@ const double q_coef = 5000; // Inward heat flux in W/m²
 const double T_ext = 200; // Outside temperature in K
 const double T_0 = 300; // Initial temperature in K
 
-const double h_coef = 10; // Heat transfer coefficient for the right boundary in W/(m².K)
+const double h_coef(double y, double t, double random_nbr) {
+    double y0 = (t_fin - t) / t_fin;
+    double hlow = 1;
+    double hhigh = 100;
+    double width = 0.05;
+
+    return hlow + (hhigh - hlow) / (1 + exp(-(y - y0) / width));
+    //if (y < y0) {
+    //    return hlow;
+    //}
+    //else {
+    //    return hhigh + random_nbr;
+    //}
+    //return NAN;
+} // Heat transfer coefficient for the right boundary in W/(m².K)
 
 //---------------------------------------------
 
@@ -75,12 +90,12 @@ static double neumann_BC_fct(double x, double y, std::vector<double>& params) {
 
 static double Robin_BC_vect_fct(double x, double y, std::vector<double>& params) {
     // Function in the integrand for the Neumann BC
-    return h_coef * T_ext;
+    return h_coef(y, params[0], params[1]) * T_ext;
 }
 
 static double Robin_BC_mat_fct(double x, double y, std::vector<double>& params) {
     // No source terms
-    return h_coef;
+    return h_coef(y, params[0], params[1]);
 }
 
 //static double u0_fct(double x, double y, std::vector<double>& params) {
@@ -173,12 +188,22 @@ void store_2d_vector_in_file(std::string filename, vector<vector<double>>& array
 }
 
 int main() {
+    // RNG setup
+    std::random_device rd{};
+    std::mt19937 gen{ rd() };
+
+    std::normal_distribution<double> gauss{0, 5};
+    auto random_float = [&gen, &gauss] {return gauss(gen);};
+
+    // Mesh Setup, matrix Builder Setup
     Mesh Reader;
-    Reader.MeshReaderMSH("t1.msh");
+    Reader.MeshReaderMSH("t2.msh");
 
     Matrix_Builder MBuild;
 
     Solve_matrix_system Solver;
+
+ 
 
     // Check if version is right
     cout << "File version : " << Reader.file_version << endl;
@@ -193,8 +218,12 @@ int main() {
     //     cout << Reader.Elems["quad"][i].Nodes[0] << " " << Reader.Elems["quad"][i].Nodes[1] << " " << Reader.Elems["quad"][i].Nodes[2] << " " << Reader.Elems["quad"][i].Nodes[3] << endl;
     // }
     cout << "Number of boundary elements : " << Reader.num_Elems["line"] << endl;
-    cout << "Building stiffness matrix" << endl;
 
+
+    // For plotting values at specific points, first setup vectors and find the DOFs of specific points
+
+
+    cout << "Building stiffness matrix" << endl;
     Volume_Inner_grad_Integral IntegrateK;
     MBuild.build_matrix(Reader, K, IntegrateK, K_function);
 
@@ -221,15 +250,17 @@ int main() {
 
     // First, we calculate the initial condition at t=0
     MBuild.build_initial_T(Reader, dP_previous, T0);
-    store_1d_vector_in_file("result_t_0", dP_previous);
+    store_1d_vector_in_file("result_step_0", dP_previous);
 
     // // Then we loop on each timestep
     for (int i = 0; i < n_time; i++) {
         double t = (i + 1) * dt;
+        double additional_param = random_float();
         cout << "Timestep t = " << t << endl;
+        cout << "Random number : " << additional_param << endl;
         std::vector<std::vector<double>> A_matrix(n_dof, std::vector<double>(n_dof));
         std::vector<double> b_vector(n_dof);
-        std::vector<double> params_for_fct = { t };
+        std::vector<double> params_for_fct = { t , additional_param };
 
         MBuild.build_vector(Reader, F, IntegrateF, f_function);
 
@@ -241,7 +272,7 @@ int main() {
         // Neumann boundary imposition
         cout << "Neumann BC ";
         Boundary_Vector_Integral Neumann_integrator;
-        MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, neumann_BC_fct, left_boundary, params_for_fct);
+        //MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, neumann_BC_fct, left_boundary, params_for_fct);
         store_1d_vector_in_file("F", F);
 
         // Robin boundary imposition
@@ -262,7 +293,7 @@ int main() {
         A_matrix.clear();
         b_vector.clear();
 
-        store_1d_vector_in_file("result_t_" + to_string(t), dP);
+        store_1d_vector_in_file("result_step_" + to_string(i+1), dP);
         dP_previous.swap(dP);
         F_previous.swap(F);
         std::fill(F.begin(), F.end(), 0.0);

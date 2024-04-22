@@ -25,15 +25,15 @@
     <Filter Include="Source Files\Shape Functions">
       <UniqueIdentifier>{f94c9ead-1f4c-497f-a84b-b7421b505c8d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Matrix_handling">
+      <UniqueIdentifier>{07ca7dd8-441b-416e-866b-4da32c04a535}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Matrix_handling">
+      <UniqueIdentifier>{6c33c140-2795-472c-8908-418303820c6e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Solve_matrix_system.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Integrals.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Mesh.cpp">
@@ -48,21 +48,21 @@
     <ClCompile Include="Shape_functions.cpp">
       <Filter>Source Files\Shape Functions</Filter>
     </ClCompile>
-    <ClCompile Include="Matrix_Assembly.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Matrix.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Matrix_handling</Filter>
+    </ClCompile>
+    <ClCompile Include="Matrix_Assembly.cpp">
+      <Filter>Source Files\Matrix_handling</Filter>
+    </ClCompile>
+    <ClCompile Include="Solve_matrix_system.cpp">
+      <Filter>Source Files\Matrix_handling</Filter>
+    </ClCompile>
+    <ClCompile Include="Integrals.cpp">
+      <Filter>Source Files\Matrix_handling</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Solve_matrix_system.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Integrals.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Mesh.h">
@@ -77,14 +77,20 @@
     <ClInclude Include="Shape_functions.h">
       <Filter>Header Files\Shape Functions</Filter>
     </ClInclude>
-    <ClInclude Include="Matrix_Assembly.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Aliases.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Integrals.h">
+      <Filter>Header Files\Matrix_handling</Filter>
+    </ClInclude>
     <ClInclude Include="Matrix.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Matrix_handling</Filter>
+    </ClInclude>
+    <ClInclude Include="Matrix_Assembly.h">
+      <Filter>Header Files\Matrix_handling</Filter>
+    </ClInclude>
+    <ClInclude Include="Solve_matrix_system.h">
+      <Filter>Header Files\Matrix_handling</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

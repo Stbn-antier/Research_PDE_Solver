@@ -25,6 +25,7 @@ public:
     void MeshReaderMSH(string filename);
     int FindBoundaryElementWithinMesh(Element elem, std::string search_type);
     int FindPositionOfBoundaryWithinElement(Element elem_boundary, Element elem_domain);
+    int FindDofFromCoords(double x, double y, double epsilon);
     ~Mesh();
 };
 
