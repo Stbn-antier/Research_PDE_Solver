@@ -154,7 +154,7 @@ int Mesh::FindDofFromCoords(double x, double y, double epsilon)
 {
     int dof_to_find = -1;
     for (int i = 0; i < num_nodes; i++) {
-        if (std::fabs(Nodes[i][0] - x) < epsilon && std::fabs(Nodes[i][1] - x) < epsilon) {
+        if (std::fabs(Nodes[i][0] - x) < epsilon && std::fabs(Nodes[i][1] - y) < epsilon) {
             return i;
         }
     }

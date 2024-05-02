@@ -13,17 +13,11 @@
 
 using namespace std;
 
-const double width = 1.0;
-const double height = 1.0;
-const int n_width = 2; // Number of elements in x direction <-->
-const int n_height = 2; // Number of elements in y direction ^|v 
 int n_elem = 464;
 const int n_sf = 4; // Number of shape function per element
-const int n_dof = 505; // Number of nodes | à modifier à chaque fois, 505 pour t2, 143 pour t1
-const double hw = 1 / width;
-const double hh = 1 / height; // Finite element height&width
+const int n_dof = 1411; // Number of nodes | à modifier à chaque fois, 505 pour t2, 143 pour t1
 
-const int report_step = 1; // Report progress at every 1/report_step % of progress
+const int report_step = 4; // Report progress at every 1/report_step % of progress
 
 const double t_fin = 10; // Final time of simulation
 const double n_time = 50; // Number of time steps not including t=0
@@ -39,29 +33,50 @@ std::vector<std::vector<double>> C(n_dof, std::vector<double>(n_dof)); // Dampin
 
 //---------------------------------------------
 // Constants for the different functions
+const double lx2 = 0.0125; // Width of the sample (half of total width)
+const double Ly = 0.1; // Height of the sample
 
-const double k_iso = 50; // Heat transfer coefficient in W/m²
-const double rho = 1; // Density of the material in kg/m^3
-const double Cp = 500; // Heat capacity in J/(kg.K)
-const double q_coef = 5000; // Inward heat flux in W/m²
-const double T_ext = 200; // Outside temperature in K
-const double T_0 = 300; // Initial temperature in K
+const double k_iso = 44.5; // Heat transfer coefficient in W/m²
+const double rho = 7850; // Density of the material in kg/m^3
+const double Cp = 475; // Heat capacity in J/(kg.K)
 
-const double h_coef(double y, double t, double random_nbr) {
-    double y0 = (t_fin - t) / t_fin;
-    double hlow = 1;
-    double hhigh = 100;
-    double width = 0.05;
+const double T_ext = 300; // Outside temperature in K
+const double T_0 = 1100; // Initial temperature in K
 
-    return hlow + (hhigh - hlow) / (1 + exp(-(y - y0) / width));
-    //if (y < y0) {
-    //    return hlow;
-    //}
-    //else {
-    //    return hhigh + random_nbr;
-    //}
-    //return NAN;
-} // Heat transfer coefficient for the right boundary in W/(m².K)
+const double hconv = 730;
+const double hnb = 15000;
+const double hfb = 140;
+
+const double Lnb = 0.03;
+//const double ynb = 0.02;
+const double xfb = 0.005;
+
+const double h_coef_right(double y, double t, double random_nbr) {
+    // Heat transfer coefficient for the right boundary in W/(m².K)
+    double ynb = Ly * (t) / (0.8 * t_fin);
+
+    if (y < ynb) {
+        return hconv;
+    }
+    else if (ynb <= y && y <= ynb + Lnb) {
+        return hnb;
+    }
+    else if (ynb + Lnb < y) {
+        return hfb;
+    }
+    return NAN;
+}
+
+const double h_coef_top(double x, double t, double random_nbr) {
+    // Heat transfer coefficient for the right boundary in W/(m².K)
+    if (x <= xfb) {
+        return hconv;
+    }
+    else if (xfb < x) {
+        return hfb;
+    }
+    return NAN;
+}
 
 //---------------------------------------------
 
@@ -80,28 +95,33 @@ static double f_function(double x, double y) {
     return 0.0;
 }
 
-static double neumann_BC_fct(double x, double y, std::vector<double>& params) {
-    // Function in the integrand for the Neumann BC
-    if (y < 0.7 && y > 0.3 && params[0] >= 3) {
-        return q_coef;
-    };
-    return 0;
+// Boundary condition functions
+
+static double Robin_BC_vect_fct_right(double x, double y, std::vector<double>& params) {
+    return h_coef_right(y, params[0], params[1]) * T_ext;
 }
 
-static double Robin_BC_vect_fct(double x, double y, std::vector<double>& params) {
-    // Function in the integrand for the Neumann BC
-    return h_coef(y, params[0], params[1]) * T_ext;
+static double Robin_BC_mat_fct_right(double x, double y, std::vector<double>& params) {
+    return h_coef_right(y, params[0], params[1]);
 }
 
-static double Robin_BC_mat_fct(double x, double y, std::vector<double>& params) {
-    // No source terms
-    return h_coef(y, params[0], params[1]);
+static double Robin_BC_vect_fct_top(double x, double y, std::vector<double>& params) {
+    return h_coef_top(x, params[0], params[1]) * T_ext;
 }
 
-//static double u0_fct(double x, double y, std::vector<double>& params) {
-//    // Function u0 in the Dirichlet boundary condition : T=u₀ on 𝛤
-//    return 1 + pow(x, 2) / 2 + pow(y, 2) + 4 * params[0];
-//}
+static double Robin_BC_mat_fct_top(double x, double y, std::vector<double>& params) {
+    return h_coef_top(x, params[0], params[1]);
+}
+
+static double Robin_BC_vect_fct_bottom(double x, double y, std::vector<double>& params) {
+    return hconv * T_ext;
+}
+
+static double Robin_BC_mat_fct_bottom(double x, double y, std::vector<double>& params) {
+    return hconv;
+}
+
+// Initial time function
 
 static double T0(std::vector<double>& coordinates) {
     return T_0;
@@ -109,6 +129,7 @@ static double T0(std::vector<double>& coordinates) {
 
 
 //---------------------------------------------
+// Functions defining where the boundaries are
 
 static bool left_boundary(Mesh& Reader, int index_line) {
     // Returns TRUE if the LINE element at index index_line is on the left boundary
@@ -118,8 +139,8 @@ static bool left_boundary(Mesh& Reader, int index_line) {
 
 static bool right_boundary(Mesh& Reader, int index_line) {
     // Returns TRUE if the LINE element at index index_line is on the right boundary
-    return Reader.Nodes[Reader.Elems["line"][index_line].Nodes[0]][0] > 1 - 1e-10\
-        && Reader.Nodes[Reader.Elems["line"][index_line].Nodes[1]][0] > 1 - 1e-10;
+    return Reader.Nodes[Reader.Elems["line"][index_line].Nodes[0]][0] > lx2 - 1e-10\
+        && Reader.Nodes[Reader.Elems["line"][index_line].Nodes[1]][0] > lx2 - 1e-10;
 }
 
 static bool bottom_boundary(Mesh& Reader, int index_line) {
@@ -130,20 +151,20 @@ static bool bottom_boundary(Mesh& Reader, int index_line) {
 
 static bool top_boundary(Mesh& Reader, int index_line) {
     // Returns TRUE if the LINE element at index index_line is on the top boundary
-    return Reader.Nodes[Reader.Elems["line"][index_line].Nodes[0]][1] > 1 - 1e-10\
-        && Reader.Nodes[Reader.Elems["line"][index_line].Nodes[1]][1] > 1 - 1e-10;
+    return Reader.Nodes[Reader.Elems["line"][index_line].Nodes[0]][1] > Ly - 1e-10\
+        && Reader.Nodes[Reader.Elems["line"][index_line].Nodes[1]][1] > Ly - 1e-10;
 }
 
 static bool all_boundary(Mesh& Reader, int index_node) {
     // Returns TRUE if the NODE at index index_node in on a boundary of the domain
-    return (Reader.Nodes[index_node][0] < 0 + 1e-10 || Reader.Nodes[index_node][0] > 1 - 1e-10 || \
-        Reader.Nodes[index_node][1] < 0 + 1e-10 || Reader.Nodes[index_node][1] > 1 - 1e-10);
+    return (Reader.Nodes[index_node][0] < 0 + 1e-10 || Reader.Nodes[index_node][0] > lx2 - 1e-10 || \
+        Reader.Nodes[index_node][1] < 0 + 1e-10 || Reader.Nodes[index_node][1] > Ly - 1e-10);
 }
 
-static bool left_boundary_node(Mesh& Reader, int index_node) {
-    // Returns TRUE if the NODE at index index_node in on a boundary of the domain
-    return (Reader.Nodes[index_node][0] < 0 + 1e-10 || Reader.Nodes[index_node][1] < 0 + 1e-10);
-}
+//static bool left_boundary_node(Mesh& Reader, int index_node) {
+//    // Returns TRUE if the NODE at index index_node in on a boundary of the domain
+//    return (Reader.Nodes[index_node][0] < 0 + 1e-10 || Reader.Nodes[index_node][1] < 0 + 1e-10);
+//}
 
 //---------------------------------------------
 
@@ -197,7 +218,7 @@ int main() {
 
     // Mesh Setup, matrix Builder Setup
     Mesh Reader;
-    Reader.MeshReaderMSH("t2.msh");
+    Reader.MeshReaderMSH("mesh_rectangle.msh");
 
     Matrix_Builder MBuild;
 
@@ -221,8 +242,28 @@ int main() {
 
 
     // For plotting values at specific points, first setup vectors and find the DOFs of specific points
+    int dof_a = Reader.FindDofFromCoords(0, 0.75 * Ly, 1e-6);
+    cout << "Point A is DOF number " << dof_a << std::endl;
+    int dof_b = Reader.FindDofFromCoords(lx2 / 2, 0.75 * Ly, 1e-6);
+    cout << "Point B is DOF number " << dof_b << std::endl;
+    int dof_c = Reader.FindDofFromCoords(0, Ly/2, 1e-6);
+    cout << "Center of domain (Point C) is DOF number " << dof_c << std::endl;
+    int dof_d = Reader.FindDofFromCoords(lx2 / 2, Ly/2, 1e-6);
+    cout << "Point D is DOF number " << dof_d << std::endl;
+    int dof_e = Reader.FindDofFromCoords(0, 0.25 * Ly, 1e-6);
+    cout << "Point E is DOF number " << dof_e << std::endl;
+    int dof_f = Reader.FindDofFromCoords(lx2 / 2, 0.25 * Ly, 1e-6);
+    cout << "Point F is DOF number " << dof_f << std::endl;
+    
+    std::vector<double> probe_Ta(n_time + 1);
+    std::vector<double> probe_Tb(n_time + 1);
+    std::vector<double> probe_Tc(n_time + 1);
+    std::vector<double> probe_Td(n_time + 1);
+    std::vector<double> probe_Te(n_time + 1);
+    std::vector<double> probe_Tf(n_time + 1);
 
 
+    // Building constant matrixes and vectors
     cout << "Building stiffness matrix" << endl;
     Volume_Inner_grad_Integral IntegrateK;
     MBuild.build_matrix(Reader, K, IntegrateK, K_function);
@@ -251,6 +292,12 @@ int main() {
     // First, we calculate the initial condition at t=0
     MBuild.build_initial_T(Reader, dP_previous, T0);
     store_1d_vector_in_file("result_step_0", dP_previous);
+    probe_Ta[0] = dP_previous[dof_a];
+    probe_Tb[0] = dP_previous[dof_b];
+    probe_Tc[0] = dP_previous[dof_c];
+    probe_Td[0] = dP_previous[dof_d];
+    probe_Te[0] = dP_previous[dof_e];
+    probe_Tf[0] = dP_previous[dof_f];
 
     // // Then we loop on each timestep
     for (int i = 0; i < n_time; i++) {
@@ -278,7 +325,16 @@ int main() {
         // Robin boundary imposition
         cout << "Robin BC ";
         Boundary_Matrix_Integral Robin_integrator;
-        MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, Robin_BC_vect_fct, Robin_BC_mat_fct, right_boundary, params_for_fct);
+        // Top boundary
+        MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator,\
+            Robin_BC_vect_fct_top, Robin_BC_mat_fct_top, top_boundary, params_for_fct);
+        // Right boundary
+        MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator,\
+            Robin_BC_vect_fct_right, Robin_BC_mat_fct_right, right_boundary, params_for_fct);
+        // Bottom boundary
+        MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator,\
+            Robin_BC_vect_fct_bottom, Robin_BC_mat_fct_bottom, bottom_boundary, params_for_fct);
+
 
         // Dirichlet boundary imposition
         //MBuild.dirichlet_BC(Reader, A_matrix, b_vector, u0_fct, params_dirichlet, left_boundary_node);
@@ -289,6 +345,13 @@ int main() {
         store_1d_vector_in_file("b", b_vector);
         store_2d_vector_in_file("A", A_matrix);
 
+        probe_Ta[i + 1] = dP[dof_a];
+        probe_Tb[i + 1] = dP[dof_b];
+        probe_Tc[i + 1] = dP[dof_c];
+        probe_Td[i + 1] = dP[dof_d];
+        probe_Te[i + 1] = dP[dof_e];
+        probe_Tf[i + 1] = dP[dof_f];
+
 
         A_matrix.clear();
         b_vector.clear();
@@ -298,5 +361,12 @@ int main() {
         F_previous.swap(F);
         std::fill(F.begin(), F.end(), 0.0);
     }
+
+    store_1d_vector_in_file("T_A", probe_Ta);
+    store_1d_vector_in_file("T_B", probe_Tb);
+    store_1d_vector_in_file("T_C", probe_Tc);
+    store_1d_vector_in_file("T_D", probe_Td);
+    store_1d_vector_in_file("T_E", probe_Te);
+    store_1d_vector_in_file("T_F", probe_Tf);
     return 0;
 };
