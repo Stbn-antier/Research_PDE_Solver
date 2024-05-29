@@ -19,7 +19,7 @@ int n_elem = 464;
 const int n_sf = 4; // Number of shape function per element
 const int n_dof = 1411; // Number of nodes | à modifier à chaque fois, 505 pour t2, 143 pour t1
 
-const int report_step = 4; // Report progress at every 1/report_step % of progress
+const int report_step = 1; // Report progress at every 1/report_step % of progress
 
 const double t_fin = 10; // Final time of simulation
 const double n_time = 50; // Number of time steps not including t=0
@@ -46,37 +46,34 @@ const double T_ext = 300; // Outside temperature in K
 const double T_0 = 1100; // Initial temperature in K
 
 const double hconv = 730;
-//const double hnb = 15000;
+double hnb = 15000;
 const double hfb = 140;
 
-const double Lnb = 0.03;
-//const double ynb = 0.02;
-const double xfb = 0.005;
+const double lfb = 0.005;
 
 //---------------------------------------------
 // Parameters to vary
-//const double tau = 8; // Time for the heat transfer to go throughout the sample
-std::vector<double> tau_list = { 2 , 4 , 6 , 8 };
-std::vector<double> hnb_list = { 10000 , 12500 , 15000 , 17500 , 20000 };
-std::vector<double> Lnb_list = { 0.005 , 0.01, 0.02 , 0.03 , 0.04 };
-const double stand_dev = 5; // Standard deviation of the gaussian distribution used
+double Lnb = 0.03;
+double Ldotconv = 0.0125; // Speed of the nucleation bubbling layer displacement
+const double stand_dev = 0.005; // Standard deviation of the gaussian distribution used
+const int num_loops = 100;
 
 
 const double h_coef_right(double y, std::vector<double>& params) {
     // Heat transfer coefficient for the right boundary in W/(m².K)
     // Additional parameters are :
-    // params[0] -> t, params[1] -> random_float, params[2] -> tau
+    // params[0] -> t, params[1] -> Lconv(t-1)
     //
 
-    double ynb = Ly * (params[0]) / (params[2]);
+    double Lconv = params[1];
 
-    if (y < ynb) {
+    if (y < Lconv) {
         return hconv;
     }
-    else if (ynb <= y && y <= ynb + params[4]) {
-        return params[3];
+    else if (Lconv <= y && y <= Lconv + Lnb) {
+        return hnb;
     }
-    else if (ynb + params[4] < y) {
+    else if (Lconv + Lnb < y) {
         return hfb;
     }
     return NAN;
@@ -84,10 +81,13 @@ const double h_coef_right(double y, std::vector<double>& params) {
 
 const double h_coef_top(double x, std::vector<double>& params) {
     // Heat transfer coefficient for the right boundary in W/(m².K)
-    if (x <= xfb) {
+    double Lconv = params[1];
+    double alpha = lfb * (Ly-Lnb-Lconv) / (Ly-Lnb);
+
+    if (x <= lx2 - alpha) {
         return hconv;
     }
-    else if (xfb < x) {
+    else if (lx2 - alpha < x) {
         return hfb;
     }
     return NAN;
@@ -238,6 +238,11 @@ int main() {
     Matrix_Builder MBuild;
 
     Solve_matrix_system Solver;
+
+    // Parameters setup in filestream
+    std::ifstream param_file;
+    param_file.open("parameters.txt");
+    std::string param_line;
     
 
 
@@ -277,7 +282,7 @@ int main() {
     std::vector<double> probe_Te(n_time + 1);
     std::vector<double> probe_Tf(n_time + 1);
 
-    std::vector<double> rnd_vector(n_time + 1); // Storage for the realizations of random
+    std::vector<double> Lconv_vector(n_time + 1); // Storage for the realizations of random
 
 
     // Building constant matrixes and vectors
@@ -306,103 +311,194 @@ int main() {
     //store_2d_vector_in_file("C", C);
     //store_2d_vector_in_file("K", K);
 
-    // Looping on the different parameters used
-    int total_length = tau_list.size() * hnb_list.size() * Lnb_list.size();
-    for (int i_tau = 0; i_tau < tau_list.size(); i_tau++) {
-        for (int i_hnb = 0; i_hnb < hnb_list.size(); i_hnb++) {
-            for (int i_Lnb = 0; i_Lnb < Lnb_list.size(); i_Lnb++) {
-                double tau = tau_list[i_tau];
-                double hnb = hnb_list[i_hnb];
-                double Lnb = Lnb_list[i_Lnb];
+    int i_loop = 0;
+    while (std::getline(param_file, param_line)) {
+        std::istringstream iss_param(param_line);
+        iss_param >> hnb >> Lnb >> Ldotconv;
 
-                std::string path_storage = "results/tau_" + std::format("{:.0f}", tau) + "_hnb_" + std::format("{:.0f}", hnb) + "_Lnb_" + std::format("{:.3f}", Lnb) + "/";
-                std::filesystem::create_directory(path_storage);
+        std::string path_storage = "results/loop_" + to_string(i_loop + 1) + "/";
+        std::filesystem::create_directory(path_storage);
 
-                // First, we calculate the initial condition at t=0
-                MBuild.build_initial_T(Reader, dP_previous, T0);
-                store_1d_vector_in_file(path_storage + "result_step_0", dP_previous);
-                probe_Ta[0] = dP_previous[dof_a];
-                probe_Tb[0] = dP_previous[dof_b];
-                probe_Tc[0] = dP_previous[dof_c];
-                probe_Td[0] = dP_previous[dof_d];
-                probe_Te[0] = dP_previous[dof_e];
-                probe_Tf[0] = dP_previous[dof_f];
-                rnd_vector[0] = 0;
+        // First, we calculate the initial condition at t=0
+        MBuild.build_initial_T(Reader, dP_previous, T0);
+        store_1d_vector_in_file(path_storage + "result_step_0", dP_previous);
+        probe_Ta[0] = dP_previous[dof_a];
+        probe_Tb[0] = dP_previous[dof_b];
+        probe_Tc[0] = dP_previous[dof_c];
+        probe_Td[0] = dP_previous[dof_d];
+        probe_Te[0] = dP_previous[dof_e];
+        probe_Tf[0] = dP_previous[dof_f];
 
-                // // Then we loop on each timestep
-                for (int i = 0; i < n_time; i++) {
-                    double t = (i + 1) * dt;
-                    double additional_param = random_float();
-                    rnd_vector[i + 1] = additional_param;
-                    cout << "Loop number " << i_Lnb+i_hnb+i_tau << "/" << total_length << " Timestep t = " << t << endl;
-                    cout << "Random number : " << additional_param << endl;
-                    std::vector<std::vector<double>> A_matrix(n_dof, std::vector<double>(n_dof));
-                    std::vector<double> b_vector(n_dof);
-                    std::vector<double> params_for_fct = { t , additional_param , tau , hnb , Lnb };
+        Lconv_vector[0] = 0; // Storing Lconv
 
-                    MBuild.build_vector(Reader, F, IntegrateF, f_function);
+        // Then we loop on each timestep
+        for (int i = 0; i < n_time; i++) {
+            double t = (i + 1) * dt;
+            double additional_param = random_float();
+            Lconv_vector[i + 1] = Lconv_vector[i] + dt * Ldotconv; // + additional_param
 
+            cout << "Loop number n=" << i_loop + 1 << ", Timestep t = " << t << endl;
+            cout << "Params this loop : hnb=" << hnb << " Lnb=" << Lnb << " Ldotconv=" << Ldotconv << std::endl;
+            //cout << "Random number : " << additional_param << endl;
 
+            std::vector<std::vector<double>> A_matrix(n_dof, std::vector<double>(n_dof));
+            std::vector<double> b_vector(n_dof);
+            std::vector<double> params_for_fct = { t , Lconv_vector[i + 1] };
 
-                    build_A_matrix(A_matrix);
-                    build_b_vector(b_vector);
-
-                    // Neumann boundary imposition
-                    cout << "Neumann BC ";
-                    Boundary_Vector_Integral Neumann_integrator;
-                    //MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, neumann_BC_fct, left_boundary, params_for_fct);
-                    //store_1d_vector_in_file("F", F);
-
-                    // Robin boundary imposition
-                    cout << "Robin BC ";
-                    Boundary_Matrix_Integral Robin_integrator;
-                    // Top boundary
-                    MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
-                        Robin_BC_vect_fct_top, Robin_BC_mat_fct_top, top_boundary, params_for_fct);
-                    // Right boundary
-                    MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
-                        Robin_BC_vect_fct_right, Robin_BC_mat_fct_right, right_boundary, params_for_fct);
-                    // Bottom boundary
-                    MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
-                        Robin_BC_vect_fct_bottom, Robin_BC_mat_fct_bottom, bottom_boundary, params_for_fct);
+            MBuild.build_vector(Reader, F, IntegrateF, f_function);
 
 
-                    // Dirichlet boundary imposition
-                    //MBuild.dirichlet_BC(Reader, A_matrix, b_vector, u0_fct, params_dirichlet, left_boundary_node);
 
-                    params_for_fct.clear();
+            build_A_matrix(A_matrix);
+            build_b_vector(b_vector);
 
-                    Solver.solve_system(A_matrix, b_vector, dP);
-                    //store_1d_vector_in_file("b", b_vector);
-                    //store_2d_vector_in_file("A", A_matrix);
+            // Neumann boundary imposition
+            cout << "Neumann BC ";
+            Boundary_Vector_Integral Neumann_integrator;
+            //MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, neumann_BC_fct, left_boundary, params_for_fct);
+            //store_1d_vector_in_file("F", F);
 
-                    probe_Ta[i + 1] = dP[dof_a];
-                    probe_Tb[i + 1] = dP[dof_b];
-                    probe_Tc[i + 1] = dP[dof_c];
-                    probe_Td[i + 1] = dP[dof_d];
-                    probe_Te[i + 1] = dP[dof_e];
-                    probe_Tf[i + 1] = dP[dof_f];
+            // Robin boundary imposition
+            cout << "Robin BC ";
+            Boundary_Matrix_Integral Robin_integrator;
+            // Top boundary
+            MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
+                Robin_BC_vect_fct_top, Robin_BC_mat_fct_top, top_boundary, params_for_fct);
+            // Right boundary
+            MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
+                Robin_BC_vect_fct_right, Robin_BC_mat_fct_right, right_boundary, params_for_fct);
+            // Bottom boundary
+            MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
+                Robin_BC_vect_fct_bottom, Robin_BC_mat_fct_bottom, bottom_boundary, params_for_fct);
 
 
-                    A_matrix.clear();
-                    b_vector.clear();
+            // Dirichlet boundary imposition
+            //MBuild.dirichlet_BC(Reader, A_matrix, b_vector, u0_fct, params_dirichlet, left_boundary_node);
 
-                    store_1d_vector_in_file(path_storage + "/result_step_" + to_string(i + 1), dP);
-                    dP_previous.swap(dP);
-                    F_previous.swap(F);
-                    std::fill(F.begin(), F.end(), 0.0);
-                }
+            params_for_fct.clear();
 
-                store_1d_vector_in_file(path_storage + "T_A", probe_Ta);
-                store_1d_vector_in_file(path_storage + "T_B", probe_Tb);
-                store_1d_vector_in_file(path_storage + "T_C", probe_Tc);
-                store_1d_vector_in_file(path_storage + "T_D", probe_Td);
-                store_1d_vector_in_file(path_storage + "T_E", probe_Te);
-                store_1d_vector_in_file(path_storage + "T_F", probe_Tf);
+            Solver.solve_system(A_matrix, b_vector, dP);
+            //store_1d_vector_in_file("b", b_vector);
+            //store_2d_vector_in_file("A", A_matrix);
 
-                //store_1d_vector_in_file(path_storage + "rnd_vector", rnd_vector);
-            }
+            probe_Ta[i + 1] = dP[dof_a];
+            probe_Tb[i + 1] = dP[dof_b];
+            probe_Tc[i + 1] = dP[dof_c];
+            probe_Td[i + 1] = dP[dof_d];
+            probe_Te[i + 1] = dP[dof_e];
+            probe_Tf[i + 1] = dP[dof_f];
+
+
+            A_matrix.clear();
+            b_vector.clear();
+
+            store_1d_vector_in_file(path_storage + "/result_step_" + to_string(i + 1), dP);
+            dP_previous.swap(dP);
+            F_previous.swap(F);
+            std::fill(F.begin(), F.end(), 0.0);
         }
+
+        store_1d_vector_in_file(path_storage + "T_A", probe_Ta);
+        store_1d_vector_in_file(path_storage + "T_B", probe_Tb);
+        store_1d_vector_in_file(path_storage + "T_C", probe_Tc);
+        store_1d_vector_in_file(path_storage + "T_D", probe_Td);
+        store_1d_vector_in_file(path_storage + "T_E", probe_Te);
+        store_1d_vector_in_file(path_storage + "T_F", probe_Tf);
+
+        store_1d_vector_in_file(path_storage + "Lconv", Lconv_vector);
+
+        i_loop ++;
     }
+    //for (int i_loop = 0; i_loop < num_loops; i_loop++) {
+    //    std::string path_storage = "results/loop_" + to_string(i_loop+1) + "/";
+    //    std::filesystem::create_directory(path_storage);
+
+    //    // First, we calculate the initial condition at t=0
+    //    MBuild.build_initial_T(Reader, dP_previous, T0);
+    //    store_1d_vector_in_file(path_storage + "result_step_0", dP_previous);
+    //    probe_Ta[0] = dP_previous[dof_a];
+    //    probe_Tb[0] = dP_previous[dof_b];
+    //    probe_Tc[0] = dP_previous[dof_c];
+    //    probe_Td[0] = dP_previous[dof_d];
+    //    probe_Te[0] = dP_previous[dof_e];
+    //    probe_Tf[0] = dP_previous[dof_f];
+
+    //    Lconv_vector[0] = 0; // Storing Lconv
+
+    //    // Then we loop on each timestep
+    //    for (int i = 0; i < n_time; i++) {
+    //        double t = (i + 1) * dt;
+    //        double additional_param = random_float();
+    //        Lconv_vector[i + 1] = Lconv_vector[i] + dt * Ldotconv + additional_param;
+
+    //        cout << "Loop number n=" << i_loop+1 << "/" << num_loops << ", Timestep t = " << t << endl;
+    //        cout << "Random number : " << additional_param << endl;
+
+    //        std::vector<std::vector<double>> A_matrix(n_dof, std::vector<double>(n_dof));
+    //        std::vector<double> b_vector(n_dof);
+    //        std::vector<double> params_for_fct = { t , Lconv_vector[i+1]};
+
+    //        MBuild.build_vector(Reader, F, IntegrateF, f_function);
+
+
+
+    //        build_A_matrix(A_matrix);
+    //        build_b_vector(b_vector);
+
+    //        // Neumann boundary imposition
+    //        cout << "Neumann BC ";
+    //        Boundary_Vector_Integral Neumann_integrator;
+    //        //MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, neumann_BC_fct, left_boundary, params_for_fct);
+    //        //store_1d_vector_in_file("F", F);
+
+    //        // Robin boundary imposition
+    //        cout << "Robin BC ";
+    //        Boundary_Matrix_Integral Robin_integrator;
+    //        // Top boundary
+    //        MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
+    //            Robin_BC_vect_fct_top, Robin_BC_mat_fct_top, top_boundary, params_for_fct);
+    //        // Right boundary
+    //        MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
+    //            Robin_BC_vect_fct_right, Robin_BC_mat_fct_right, right_boundary, params_for_fct);
+    //        // Bottom boundary
+    //        MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
+    //            Robin_BC_vect_fct_bottom, Robin_BC_mat_fct_bottom, bottom_boundary, params_for_fct);
+
+
+    //        // Dirichlet boundary imposition
+    //        //MBuild.dirichlet_BC(Reader, A_matrix, b_vector, u0_fct, params_dirichlet, left_boundary_node);
+
+    //        params_for_fct.clear();
+
+    //        Solver.solve_system(A_matrix, b_vector, dP);
+    //        //store_1d_vector_in_file("b", b_vector);
+    //        //store_2d_vector_in_file("A", A_matrix);
+
+    //        probe_Ta[i + 1] = dP[dof_a];
+    //        probe_Tb[i + 1] = dP[dof_b];
+    //        probe_Tc[i + 1] = dP[dof_c];
+    //        probe_Td[i + 1] = dP[dof_d];
+    //        probe_Te[i + 1] = dP[dof_e];
+    //        probe_Tf[i + 1] = dP[dof_f];
+
+
+    //        A_matrix.clear();
+    //        b_vector.clear();
+
+    //        store_1d_vector_in_file(path_storage + "/result_step_" + to_string(i + 1), dP);
+    //        dP_previous.swap(dP);
+    //        F_previous.swap(F);
+    //        std::fill(F.begin(), F.end(), 0.0);
+    //    }
+
+    //    store_1d_vector_in_file(path_storage + "T_A", probe_Ta);
+    //    store_1d_vector_in_file(path_storage + "T_B", probe_Tb);
+    //    store_1d_vector_in_file(path_storage + "T_C", probe_Tc);
+    //    store_1d_vector_in_file(path_storage + "T_D", probe_Td);
+    //    store_1d_vector_in_file(path_storage + "T_E", probe_Te);
+    //    store_1d_vector_in_file(path_storage + "T_F", probe_Tf);
+
+    //    store_1d_vector_in_file(path_storage + "Lconv", Lconv_vector);
+    //}
     return 0;
 };
