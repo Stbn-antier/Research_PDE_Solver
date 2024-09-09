@@ -24,10 +24,11 @@ double Volume_Matrix_Integral::Evaluate_Integrand(std::vector<double>& coord_mas
 double Volume_Matrix_Integral::Gaussian_Quadrature(int ind_i, int ind_j,\
 	std::vector<std::vector<double>>& coord_deformed, Shape_functions& Shape, integrand_function f)
 {
-	return Evaluate_Integrand(gauss_points[0], coord_deformed, ind_i, ind_j, Shape, f) +\
-		Evaluate_Integrand(gauss_points[1], coord_deformed, ind_i, ind_j, Shape, f) +\
-		Evaluate_Integrand(gauss_points[2], coord_deformed, ind_i, ind_j, Shape, f) +\
-		Evaluate_Integrand(gauss_points[3], coord_deformed, ind_i, ind_j, Shape, f);
+	double total = 0;
+	for (int i = 0; i < Shape.n_nodes; i++) {
+		total += Evaluate_Integrand(gauss_points[i], coord_deformed, ind_i, ind_j, Shape, f);
+	}
+	return total;
 }
 
 double Volume_Vector_Integral::Evaluate_Integrand(std::vector<double>& coord_master, std::vector<std::vector<double>>& coord_deformed, int ind_i, Shape_functions& Shape, integrand_function f)
@@ -38,18 +39,28 @@ double Volume_Vector_Integral::Evaluate_Integrand(std::vector<double>& coord_mas
 
 double Volume_Vector_Integral::Gaussian_Quadrature(int ind_i, std::vector<std::vector<double>>& coord_deformed, Shape_functions& Shape, integrand_function f)
 {
-	return Evaluate_Integrand(gauss_points[0], coord_deformed, ind_i, Shape, f) +\
-		Evaluate_Integrand(gauss_points[1], coord_deformed, ind_i, Shape, f) +\
-		Evaluate_Integrand(gauss_points[2], coord_deformed, ind_i, Shape, f) +\
-		Evaluate_Integrand(gauss_points[3], coord_deformed, ind_i, Shape, f);
+	//return Evaluate_Integrand(gauss_points[0], coord_deformed, ind_i, Shape, f) +\
+	//	Evaluate_Integrand(gauss_points[1], coord_deformed, ind_i, Shape, f) +\
+	//	Evaluate_Integrand(gauss_points[2], coord_deformed, ind_i, Shape, f) +\
+	//	Evaluate_Integrand(gauss_points[3], coord_deformed, ind_i, Shape, f);
+	double total = 0;
+	for (int i = 0; i < Shape.n_nodes; i++) {
+		total += Evaluate_Integrand(gauss_points[i], coord_deformed, ind_i, Shape, f);
+	}
+	return total;
 }
 
 double Volume_Inner_grad_Integral::Gaussian_Quadrature(int ind_i, int ind_j, std::vector<std::vector<double>>& coord_deformed, Shape_functions& Shape, integrand_function f)
 {
-	return Shape.InnerProdGrad(gauss_points[0], coord_deformed, ind_i, ind_j, f)\
-		+ Shape.InnerProdGrad(gauss_points[1], coord_deformed, ind_i, ind_j, f)\
-		+ Shape.InnerProdGrad(gauss_points[2], coord_deformed, ind_i, ind_j, f)\
-		+ Shape.InnerProdGrad(gauss_points[3], coord_deformed, ind_i, ind_j, f);
+	//return Shape.InnerProdGrad(gauss_points[0], coord_deformed, ind_i, ind_j, f)\
+	//	+ Shape.InnerProdGrad(gauss_points[1], coord_deformed, ind_i, ind_j, f)\
+	//	+ Shape.InnerProdGrad(gauss_points[2], coord_deformed, ind_i, ind_j, f)\
+	//	+ Shape.InnerProdGrad(gauss_points[3], coord_deformed, ind_i, ind_j, f);
+	double total = 0;
+	for (int i = 0; i < Shape.n_nodes; i++) {
+		total += Shape.InnerProdGrad(gauss_points[i], coord_deformed, ind_i, ind_j, f);
+	}
+	return total;
 }
 
 double Boundary_Vector_Integral::Evaluate_Integrand(double coord_master, std::vector<std::vector<double>>& coord_deformed, int ind_i, Shape_fct_1D& Shape, boundary_integrand f, std::vector<double>& params)

@@ -60,6 +60,15 @@
     <ClCompile Include="Integrals.cpp">
       <Filter>Source Files\Matrix_handling</Filter>
     </ClCompile>
+    <ClCompile Include="Shape_fct_3D.cpp">
+      <Filter>Source Files\Shape Functions</Filter>
+    </ClCompile>
+    <ClCompile Include="Integrals_3D.cpp">
+      <Filter>Source Files\Matrix_handling</Filter>
+    </ClCompile>
+    <ClCompile Include="Matrix_Assembly_3D.cpp">
+      <Filter>Source Files\Matrix_handling</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -90,6 +99,15 @@
       <Filter>Header Files\Matrix_handling</Filter>
     </ClInclude>
     <ClInclude Include="Solve_matrix_system.h">
+      <Filter>Header Files\Matrix_handling</Filter>
+    </ClInclude>
+    <ClInclude Include="Shape_fct_3D.h">
+      <Filter>Header Files\Shape Functions</Filter>
+    </ClInclude>
+    <ClInclude Include="Integrals_3D.h">
+      <Filter>Header Files\Matrix_handling</Filter>
+    </ClInclude>
+    <ClInclude Include="Matrix_Assembly_3D.h">
       <Filter>Header Files\Matrix_handling</Filter>
     </ClInclude>
   </ItemGroup>

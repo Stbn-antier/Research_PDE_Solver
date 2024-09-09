@@ -60,6 +60,18 @@ void Mesh::MeshReaderMSH(string filename)
                 int n_elem_in_block;
                 iss >> ent_dim >> ent_tag >> elem_type >> n_elem_in_block;
 
+                // Hexa8 elements, 3D with 8 nodes
+                if (elem_type == 5) {
+                    num_Elems["hexa"] += n_elem_in_block;
+                    for (int j = 0; j < n_elem_in_block; j++) {
+                        getline(myfile, line);
+                        istringstream iss(line);
+                        int id; int id_1; int id_2; int id_3; int id_4; int id_5; int id_6; int id_7; int id_8;
+                        iss >> id >> id_1 >> id_2 >> id_3 >> id_4 >> id_5 >> id_6 >> id_7 >> id_8;
+                        Element Elem(ent_tag, vector<int> {id_1 - 1, id_2 - 1, id_3 - 1, id_4 - 1, id_5 - 1, id_6 - 1, id_7 - 1, id_8 - 1});
+                        Elems["hexa"].push_back(Elem);
+                    }
+                }                
                 // Quad4 elements, 2D with 4 nodes
                 if (elem_type == 3) {
                     num_Elems["quad"] += n_elem_in_block;
@@ -72,6 +84,7 @@ void Mesh::MeshReaderMSH(string filename)
                         Elems["quad"].push_back(Elem);
                     }
                 }
+                // Line2 elements, 1D with 4 nodes
                 else if (elem_type == 1) {
                     num_Elems["line"] += n_elem_in_block;
                     for (int j = 0; j < n_elem_in_block; j++) {

@@ -81,7 +81,7 @@ double Shape_functions::EvaluateDerivativeMaster(std::vector<double> coord_maste
 
 double Shape_functions::Jacobian(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int line, int column) {
     // Returns the i,j component of the 2x2 jacobian
-    if (line >= dim || column >= dim) {
+    /*if (line >= dim || column >= dim) {
         throw std::overflow_error("Index of Jacobian out of range : " + std::to_string((line > column ? line : column)));
     }
     else if (line == 0 && column == 0) {
@@ -112,7 +112,12 @@ double Shape_functions::Jacobian(std::vector<double> coord_master, std::vector<s
         }
         return total;
     }
-    return -10000000;
+    return -10000000;*/
+    double total = 0;
+    for (int i = 0; i < n_nodes; i++) {
+        total += EvaluateDerivativeMaster(coord_master, i, line) * coord_deformed[i][column];
+    }
+    return total;
 }
 
 double Shape_functions::JacobianDeterminant(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed) {

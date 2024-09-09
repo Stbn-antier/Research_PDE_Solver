@@ -131,11 +131,14 @@
   <ItemGroup>
     <ClCompile Include="Element.cpp" />
     <ClCompile Include="Integrals.cpp" />
+    <ClCompile Include="Integrals_3D.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Matrix.cpp" />
     <ClCompile Include="Matrix_Assembly.cpp" />
+    <ClCompile Include="Matrix_Assembly_3D.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Shape_fct_1D.cpp" />
+    <ClCompile Include="Shape_fct_3D.cpp" />
     <ClCompile Include="Shape_functions.cpp" />
     <ClCompile Include="Solve_matrix_system.cpp" />
   </ItemGroup>
@@ -143,11 +146,14 @@
     <ClInclude Include="Element.h" />
     <ClInclude Include="Aliases.h" />
     <ClInclude Include="Integrals.h" />
+    <ClInclude Include="Integrals_3D.h" />
     <ClInclude Include="Matrix.h" />
     <ClInclude Include="Matrix_Assembly.h" />
+    <ClInclude Include="Matrix_Assembly_3D.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Shape_fct_1D.h" />
+    <ClInclude Include="Shape_fct_3D.h" />
     <ClInclude Include="Shape_functions.h" />
     <ClInclude Include="Solve_matrix_system.h" />
   </ItemGroup>
