@@ -31,6 +31,12 @@
     <Filter Include="Source Files\Matrix_handling">
       <UniqueIdentifier>{6c33c140-2795-472c-8908-418303820c6e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Output">
+      <UniqueIdentifier>{87c40880-6ea0-4ad0-a2bc-a46f5eeda634}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Output">
+      <UniqueIdentifier>{9f0149ed-08dd-4bfc-b779-db41ed3fa435}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -68,6 +74,9 @@
     </ClCompile>
     <ClCompile Include="Matrix_Assembly_3D.cpp">
       <Filter>Source Files\Matrix_handling</Filter>
+    </ClCompile>
+    <ClCompile Include="Writer.cpp">
+      <Filter>Source Files\Output</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -109,6 +118,9 @@
     </ClInclude>
     <ClInclude Include="Matrix_Assembly_3D.h">
       <Filter>Header Files\Matrix_handling</Filter>
+    </ClInclude>
+    <ClInclude Include="Writer.h">
+      <Filter>Header Files\Output</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -120,6 +120,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>C:\Program Files\Boost\boost_1_82_0</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -137,6 +138,7 @@
     <ClCompile Include="Matrix_Assembly.cpp" />
     <ClCompile Include="Matrix_Assembly_3D.cpp" />
     <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="Writer.cpp" />
     <ClCompile Include="Shape_fct_1D.cpp" />
     <ClCompile Include="Shape_fct_3D.cpp" />
     <ClCompile Include="Shape_functions.cpp" />
@@ -151,6 +153,7 @@
     <ClInclude Include="Matrix_Assembly.h" />
     <ClInclude Include="Matrix_Assembly_3D.h" />
     <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Writer.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Shape_fct_1D.h" />
     <ClInclude Include="Shape_fct_3D.h" />

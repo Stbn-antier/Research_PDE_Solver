@@ -12,6 +12,7 @@
 #include "Solve_matrix_system.h"
 #include "Integrals.h"
 #include "Matrix_Assembly.h"
+#include "Writer.h"
 
 using namespace std;
 
@@ -321,12 +322,13 @@ int main() {
     //store_2d_vector_in_file("C", C);
     //store_2d_vector_in_file("K", K);
 
-    for (int i_h = 0; i_h < 3; i_h++) {
-        for (int i_L = 0; i_L < 3; i_L++) {
-            for (int i_Ldot = 0; i_Ldot < 3; i_Ldot++) {
+    for (int i_h = 0; i_h < 1; i_h++) {
+        for (int i_L = 0; i_L < 1; i_L++) {
+            for (int i_Ldot = 0; i_Ldot < 1; i_Ldot++) {
                 for (int i_loop = 0; i_loop < num_loops; i_loop++) {
                     std::string path_storage = "results/loop_" + to_string( i_h*9*num_loops + i_L*3*num_loops + i_Ldot*num_loops + i_loop + 1) + "/";
                     std::filesystem::create_directory(path_storage);
+                    XML_Writer writer(path_storage, "Temperature");
 
                     // We set the parameters for now:
                     hnb = hnb_list[i_h];
@@ -408,6 +410,8 @@ int main() {
                         b_vector.clear();
 
                         store_1d_vector_in_file(path_storage + "/result_step_" + to_string(i + 1), dP);
+                        writer.Write_time_step(Reader, t, "T", dP);
+
                         dP_previous.swap(dP);
                         F_previous.swap(F);
                         std::fill(F.begin(), F.end(), 0.0);
