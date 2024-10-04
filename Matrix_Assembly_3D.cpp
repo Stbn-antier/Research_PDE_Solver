@@ -47,11 +47,13 @@ void Matrix_Builder3D::build_vector(Mesh& Reader, std::vector<double>& a, Volume
 void Matrix_Builder3D::dirichlet_BC(Mesh& Reader, std::vector<std::vector<double>>& A_matrix, std::vector<double>& b_vector, dirichlet_u0_3D u0_fct, std::vector<double>& u0_params, on_boundary on_bound)
 {
     std::vector<double> T_0(Reader.num_nodes, 0.0);
+    std::vector<bool> dirichlet_mask(Reader.num_nodes, 0); // Mask, if on_bound=1
 
     // Setting on boundaries based on expression
     for (int k = 0; k < Reader.num_nodes; k++) {
         if (on_bound(Reader, k)) {
             T_0[k] = u0_fct(Reader.Nodes[k][0], Reader.Nodes[k][1], Reader.Nodes[k][2], u0_params);
+            dirichlet_mask[k] = 1;
         }
     }
 
@@ -65,7 +67,7 @@ void Matrix_Builder3D::dirichlet_BC(Mesh& Reader, std::vector<std::vector<double
     for (int k = 0; k < Reader.num_nodes; k++) {
         // If the dof is on the boundary, impose the temperature
         // and reset the corresponding row and column of K
-        if (T_0[k] != 0.0) {
+        if (dirichlet_mask[k]) { // if on boundary == 1
             b_vector[k] = T_0[k];
 
             A_matrix[k][k] = 1;

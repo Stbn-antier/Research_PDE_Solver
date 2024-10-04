@@ -23,12 +23,12 @@ XML_Writer::~XML_Writer()
 void XML_Writer::Write_topology_data(Mesh& Reader)
 {
 	// Write topology dataset (connectivity between nodes, definition of elements)
-	xmlfile << "<Topology NumberOfElements=\"" + std::to_string(Reader.num_Elems["quad"]) + "\" TopologyType=\"Quadrilateral\" NodesPerElement=\"4\">" << std::endl;
-	xmlfile << "<DataItem Dimensions=\"" + std::to_string(Reader.num_Elems["quad"]) + " 4\" NumberType=\"UInt\" Format=\"XML\">" << std::endl;
+	xmlfile << "<Topology NumberOfElements=\"" + std::to_string(Reader.num_Elems["hexa"]) + "\" TopologyType=\"Hexahedron\" NodesPerElement=\"8\">" << std::endl;
+	xmlfile << "<DataItem Dimensions=\"" + std::to_string(Reader.num_Elems["hexa"]) + " 8\" NumberType=\"UInt\" Format=\"XML\">" << std::endl;
 	// Write data
-	for (int i = 0; i < Reader.num_Elems["quad"]; i++) {
-		for (int j = 0; j < 4; j++) {
-			xmlfile << std::to_string(Reader.Elems["quad"][i].Nodes[j]) << " ";
+	for (int i = 0; i < Reader.num_Elems["hexa"]; i++) {
+		for (int j = 0; j < 8; j++) {
+			xmlfile << std::to_string(Reader.Elems["hexa"][i].Nodes[j]) << " ";
 		}
 		xmlfile << std::endl;
 	}

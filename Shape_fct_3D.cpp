@@ -231,8 +231,8 @@ double Shape_fct_3D::JacobianInvert(std::vector<double> coord_master, std::vecto
 double Shape_fct_3D::InnerProdGrad(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int ind_i, int ind_j, integrand_function3D f)
 {
     return f(Coordinates_deformed(coord_master, coord_deformed, 0), Coordinates_deformed(coord_master, coord_deformed, 1), Coordinates_deformed(coord_master, coord_deformed, 2))\
-        * (EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_i, 0) * EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_j, 0)\
-        + EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_i, 1) * EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_j, 1)\
-        + EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_i, 2) * EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_j, 2))\
+        * ((EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_i, 0) * EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_j, 0))\
+        + (EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_i, 1) * EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_j, 1))\
+        + (EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_i, 2) * EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_j, 2)))\
         * abs(JacobianDeterminant(coord_master, coord_deformed));
 }
