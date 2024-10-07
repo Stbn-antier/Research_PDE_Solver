@@ -44,9 +44,9 @@ const double Cp = 1; // Heat capacity in J/(kg.K)
 const double T_ext = 300; // Outside temperature in K
 const double T_0 = 1100; // Initial temperature in K
 
-const double a = -7;
-const double b = 2;
-const double c = -1;
+const double a = 2;
+const double b = -2;
+const double c = 2;
 
 //---------------------------------------------
 const int num_loops = 100;
@@ -73,38 +73,38 @@ static double C_function(double x, double y, double z) {
 static double f_function(double x, double y, double z) {
     // Source due to second derivative
     // !!! Program solves −𝛥T=f, need to put minus sign
-    return -2*(a+b+c);
+    return -0;
 }
 
 static double u0_fct(double x, double y, double z, std::vector<double>& params) {
-    return a*std::pow(x,2) + b*std::pow(y,2) + c*std::pow(z,2);
+    return a*x + b*y + c*z;
 }
 
 // Boundary condition functions
 
-//static double Robin_BC_vect_fct_right(double x, double y, std::vector<double>& params) {
-//    return h_coef_right(y, params) * T_ext;
-//}
-//
-//static double Robin_BC_mat_fct_right(double x, double y, std::vector<double>& params) {
-//    return h_coef_right(y, params);
-//}
-//
-//static double Robin_BC_vect_fct_top(double x, double y, std::vector<double>& params) {
-//    return h_coef_top(x, params) * T_ext;
-//}
-//
-//static double Robin_BC_mat_fct_top(double x, double y, std::vector<double>& params) {
-//    return h_coef_top(x, params);
-//}
-//
-//static double Robin_BC_vect_fct_bottom(double x, double y, std::vector<double>& params) {
-//    return hconv * T_ext;
-//}
-//
-//static double Robin_BC_mat_fct_bottom(double x, double y, std::vector<double>& params) {
-//    return hconv;
-//}
+static double Neumann_BC_negx(double x, double y, double z, std::vector<double>& params) {
+    return - a;
+}
+
+static double Neumann_BC_posx(double x, double y, double z, std::vector<double>& params) {
+    return + a;
+}
+
+static double Neumann_BC_front(double x, double y, double z, std::vector<double>& params) {
+    return +b;
+}
+
+static double Neumann_BC_back(double x, double y, double z, std::vector<double>& params) {
+    return -b;
+}
+
+static double Neumann_BC_top(double x, double y, double z, std::vector<double>& params) {
+    return +c;
+}
+
+static double Neumann_BC_bottom(double x, double y, double z, std::vector<double>& params) {
+    return -c;
+}
 
 // Initial time function
 
@@ -116,30 +116,61 @@ static double T0(std::vector<double>& coordinates) {
 //---------------------------------------------
 // Functions defining where the boundaries are
 
-//static bool left_boundary(Mesh& Reader, int index_line) {
-//    // Returns TRUE if the LINE element at index index_line is on the left boundary
-//    return Reader.Nodes[Reader.Elems["line"][index_line].Nodes[0]][0] < 0 + 1e-10\
-//        && Reader.Nodes[Reader.Elems["line"][index_line].Nodes[1]][0] < 0 + 1e-10;
-//}
-//
-//static bool right_boundary(Mesh& Reader, int index_line) {
-//    // Returns TRUE if the LINE element at index index_line is on the right boundary
-//    return Reader.Nodes[Reader.Elems["line"][index_line].Nodes[0]][0] > lx2 - 1e-10\
-//        && Reader.Nodes[Reader.Elems["line"][index_line].Nodes[1]][0] > lx2 - 1e-10;
-//}
-//
-//static bool bottom_boundary(Mesh& Reader, int index_line) {
-//    // Returns TRUE if the LINE element at index index_line is on the bottom boundary
-//    return Reader.Nodes[Reader.Elems["line"][index_line].Nodes[0]][1] < 0 + 1e-10\
-//        && Reader.Nodes[Reader.Elems["line"][index_line].Nodes[1]][1] < 0 + 1e-10;
-//}
-//
-//static bool top_boundary(Mesh& Reader, int index_line) {
-//    // Returns TRUE if the LINE element at index index_line is on the top boundary
-//    return Reader.Nodes[Reader.Elems["line"][index_line].Nodes[0]][1] > Ly - 1e-10\
-//        && Reader.Nodes[Reader.Elems["line"][index_line].Nodes[1]][1] > Ly - 1e-10;
-//}
+// Boundary for 2D elements
+static bool left_surf(Mesh& Reader, int index_quad) {
+    // Returns TRUE if the quad is on the left bound
+    
+    bool res = 1;
+    for (int i = 0; i < 4; i++) { //Iterate on nodes of quad element
+        res &= (Reader.Nodes[Reader.Elems["quad"][index_quad].Nodes[i]][0] < Lxmin + 1e-3);
+    }
+    //if (res) {
+    //    std::cout << index_quad << std::endl;
+    //}
+    return res;
+}
 
+static bool right_surf(Mesh& Reader, int index_quad) {
+    bool res = 1;
+    for (int i = 0; i < 4; i++) { //Iterate on nodes of quad element
+        res &= (Reader.Nodes[Reader.Elems["quad"][index_quad].Nodes[i]][0] > Lxmax - 1e-3);
+    }
+    return res;
+}
+
+static bool top_surf(Mesh& Reader, int index_quad) {
+    bool res = 1;
+    for (int i = 0; i < 4; i++) { //Iterate on nodes of quad element
+        res &= (Reader.Nodes[Reader.Elems["quad"][index_quad].Nodes[i]][2] > Lzmax - 1e-3);
+    }
+    return res;
+}
+
+static bool bottom_surf(Mesh& Reader, int index_quad) {
+    bool res = 1;
+    for (int i = 0; i < 4; i++) { //Iterate on nodes of quad element
+        res &= (Reader.Nodes[Reader.Elems["quad"][index_quad].Nodes[i]][2] < Lzmin + 1e-3);
+    }
+    return res;
+}
+
+static bool front_surf(Mesh& Reader, int index_quad) {
+    bool res = 1;
+    for (int i = 0; i < 4; i++) { //Iterate on nodes of quad element
+        res &= (Reader.Nodes[Reader.Elems["quad"][index_quad].Nodes[i]][1] > Lymax - 1e-3);
+    }
+    return res;
+}
+
+static bool back_surf(Mesh& Reader, int index_quad) {
+    bool res = 1;
+    for (int i = 0; i < 4; i++) { //Iterate on nodes of quad element
+        res &= (Reader.Nodes[Reader.Elems["quad"][index_quad].Nodes[i]][1] < Lymin + 1e-3);
+    }
+    return res;
+}
+
+// Boundary for Nodes
 static bool all_boundary(Mesh& Reader, int index_node) {
     // Returns TRUE if the NODE at index index_node in on a boundary of the domain
     return (\
@@ -148,10 +179,13 @@ static bool all_boundary(Mesh& Reader, int index_node) {
         Reader.Nodes[index_node][2] < Lzmin + 1e-3 || Reader.Nodes[index_node][2] > Lzmax - 1e-3);
 }
 
-//static bool left_boundary_node(Mesh& Reader, int index_node) {
-//    // Returns TRUE if the NODE at index index_node in on a boundary of the domain
-//    return (Reader.Nodes[index_node][0] < 0 + 1e-10 || Reader.Nodes[index_node][1] < 0 + 1e-10);
-//}
+static bool bottom(Mesh& Reader, int index_node) {
+    return (Reader.Nodes[index_node][2] < Lzmin + 1e-3);
+}
+
+static bool bottom_top(Mesh& Reader, int index_node) {
+    return (Reader.Nodes[index_node][2] < Lzmin + 1e-3 || Reader.Nodes[index_node][2] > Lzmax - 1e-3);
+}
 
 //---------------------------------------------
 
@@ -210,7 +244,7 @@ int main() {
 
     // Read mesh in file, prepare result writer
     Mesh Reader;
-    Reader.MeshReaderMSH("Mesh/mesh_patch_small.msh");
+    Reader.MeshReaderMSH("Mesh/mesh_6x6x6.msh");
 
     XML_Writer Writer("results/", "Temperature");
 
@@ -245,42 +279,6 @@ int main() {
     C.resize(n_dof, std::vector<double>(n_dof)); // Damping matrix for time stepping
 
 
-    // Test for Jacobian inverse and jacobian implementation
-    
-    Shape_fct_3D ShapeFctsTest;
-    const double point = 1 / sqrt(3);
-    std::vector<std::vector<double>> points_test{
-    {-point, -point, -point},
-    {+point, -point, -point},
-    {+point, +point, -point},
-    {-point, +point, -point},
-    {-point, -point, +point},
-    {+point, -point, +point},
-    {+point, +point, +point},
-    {-point, +point, +point},
-    };
-    const int index_point_test = 0;
-
-    // Get nodes coordinates from element 0
-    std::cout << "Tests for element 0" << std::endl;
-    vector<vector<double>> coords_element;
-    for (int k = 0; k < ShapeFctsTest.n_nodes; k++) {
-        coords_element.push_back(Reader.Nodes[Reader.Elems["hexa"][0].Nodes[k]]);
-    }
-    std::cout << "Determinant" << ShapeFctsTest.JacobianDeterminant(points_test[index_point_test], coords_element) << std::endl;
-    std::cout << "Jacobian values" << std::endl;
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            std::cout << "i=" << i << " j=" << j << " Value =" << ShapeFctsTest.Jacobian(points_test[index_point_test], coords_element, i, j) << std::endl;
-        }
-    }
-    std::cout << "Inverse transpose Jacobian values" << std::endl;
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            std::cout << "i=" << i << " j=" << j << " Value =" << ShapeFctsTest.JacobianInvert(points_test[index_point_test], coords_element, i, j) << std::endl;
-        }
-    }
-
 
     // Building constant matrixes and vectors
     cout << "Building stiffness matrix" << endl;
@@ -290,6 +288,18 @@ int main() {
     cout << "Building force vector" << endl;
     Volume_Vector_Integral3D IntegrateF;
     MBuild.build_vector(Reader, F, IntegrateF, f_function);
+
+    // Neumann BC
+    std::cout << "Neumann BC " << std::endl;
+    std::vector<double> params_neumann = { 0.0 };
+    Boundary_Vector_Integral3D Neumann_integrator;
+    MBuild.neumann_BC(Reader, F, Neumann_integrator, Neumann_BC_negx, left_surf, params_neumann);
+    MBuild.neumann_BC(Reader, F, Neumann_integrator, Neumann_BC_posx, right_surf, params_neumann);
+    MBuild.neumann_BC(Reader, F, Neumann_integrator, Neumann_BC_front, front_surf, params_neumann);
+    MBuild.neumann_BC(Reader, F, Neumann_integrator, Neumann_BC_back, back_surf, params_neumann);
+    //MBuild.neumann_BC(Reader, F, Neumann_integrator, Neumann_BC_top, top_surf, params_neumann);
+
+    
     // Put F into previous F vector
     std::copy(F.begin(), F.end(), F_previous.begin());
 
@@ -312,7 +322,8 @@ int main() {
 
     // Dirichlet boundary imposition
     std::vector<double> params_dirichlet = { 0.0 };
-    MBuild.dirichlet_BC(Reader, K, F_previous, u0_fct, params_dirichlet, all_boundary);
+    //MBuild.dirichlet_BC(Reader, K, F_previous, u0_fct, params_dirichlet, all_boundary);
+    MBuild.dirichlet_BC(Reader, K, F_previous, u0_fct, params_dirichlet, bottom_top);
 
 
     Solver.solve_system(K, F_previous, dP);
