@@ -147,6 +147,7 @@
   <ItemGroup>
     <ClInclude Include="Element.h" />
     <ClInclude Include="Aliases.h" />
+    <ClInclude Include="Gaussian_points.h" />
     <ClInclude Include="Integrals.h" />
     <ClInclude Include="Integrals_3D.h" />
     <ClInclude Include="Matrix.h" />

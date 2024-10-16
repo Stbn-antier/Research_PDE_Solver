@@ -16,14 +16,8 @@
 
 using namespace std;
 
-int n_elem = 464;
-const int n_sf = 4; // Number of shape function per element
-//const int n_dof = 43; // Number of nodes | à modifier à chaque fois, 505 pour t2, 143 pour t1
-
-//const int report_step = 4; // Report progress at every 1/report_step % of progress
-
-const double t_fin = 10; // Final time of simulation
-const double n_time = 50; // Number of time steps not including t=0
+const double t_fin = 20; // Final time of simulation
+const double n_time = 200; // Number of time steps not including t=0
 const double dt = t_fin / n_time; // time step
 
 std::vector<std::vector<double>> K; // Stiffness matrix
@@ -37,26 +31,23 @@ std::vector<std::vector<double>> C; // Damping matrix for time stepping
 //---------------------------------------------
 // Constants for the different functions
 
-const double k_iso = 1; // Heat transfer coefficient in W/m²
-const double rho = 1; // Density of the material in kg/m^3
-const double Cp = 1; // Heat capacity in J/(kg.K)
+const double k_iso = 44.5; // Heat transfer coefficient in W/(m.K)
+const double rho = 7850; // Density of the material in kg/m^3
+const double Cp = 475; // Heat capacity in J/(kg.K)
 
 const double T_ext = 300; // Outside temperature in K
 const double T_0 = 1100; // Initial temperature in K
 
-const double a = 2;
-const double b = -2;
-const double c = 2;
+const double h_conv = 730; // Convective heat coeff
 
 //---------------------------------------------
-const int num_loops = 100;
 
-const double Lxmin = -0.5;
-const double Lxmax = 0.5;
-const double Lymin = -0.5;
-const double Lymax = 0.5;
-const double Lzmin = -0.5;
-const double Lzmax = 0.5;
+const double Lxmin = -0.0125;
+const double Lxmax = 0.0125;
+const double Lymin = -0.0125;
+const double Lymax = 0.0125;
+const double Lzmin = 0;
+const double Lzmax = 0.1;
 
 //---------------------------------------------
 
@@ -73,37 +64,35 @@ static double C_function(double x, double y, double z) {
 static double f_function(double x, double y, double z) {
     // Source due to second derivative
     // !!! Program solves −𝛥T=f, need to put minus sign
-    return -0;
+    return 0;
 }
 
-static double u0_fct(double x, double y, double z, std::vector<double>& params) {
-    return a*x + b*y + c*z;
-}
+//static double u0_fct(double x, double y, double z, std::vector<double>& params) {
+//    return 0;
+//}
 
 // Boundary condition functions
 
-static double Neumann_BC_negx(double x, double y, double z, std::vector<double>& params) {
-    return - a;
+static double Neumann_insulation(double x, double y, double z, std::vector<double>& params) {
+    return 0;
 }
 
-static double Neumann_BC_posx(double x, double y, double z, std::vector<double>& params) {
-    return + a;
+static double Neumann_in_flux(double x, double y, double z, std::vector<double>& params) {
+    //if ((-0.3 <= y && y <= 0.3) && (-0.3 <= z && z <= 0.3)) { // && (params[0] >= 7200)
+    //    return q;
+    //}
+    //else {
+    //    return 0;
+    //}
+    return q;
 }
 
-static double Neumann_BC_front(double x, double y, double z, std::vector<double>& params) {
-    return +b;
+static double Robin_matrix(double x, double y, double z, std::vector<double>& params) {
+    return h;
 }
 
-static double Neumann_BC_back(double x, double y, double z, std::vector<double>& params) {
-    return -b;
-}
-
-static double Neumann_BC_top(double x, double y, double z, std::vector<double>& params) {
-    return +c;
-}
-
-static double Neumann_BC_bottom(double x, double y, double z, std::vector<double>& params) {
-    return -c;
+static double Robin_vector(double x, double y, double z, std::vector<double>& params) {
+    return h * T_ext;
 }
 
 // Initial time function
@@ -124,9 +113,6 @@ static bool left_surf(Mesh& Reader, int index_quad) {
     for (int i = 0; i < 4; i++) { //Iterate on nodes of quad element
         res &= (Reader.Nodes[Reader.Elems["quad"][index_quad].Nodes[i]][0] < Lxmin + 1e-3);
     }
-    //if (res) {
-    //    std::cout << index_quad << std::endl;
-    //}
     return res;
 }
 
@@ -168,6 +154,10 @@ static bool back_surf(Mesh& Reader, int index_quad) {
         res &= (Reader.Nodes[Reader.Elems["quad"][index_quad].Nodes[i]][1] < Lymin + 1e-3);
     }
     return res;
+}
+
+static bool insulation_bound(Mesh& Reader, int index_quad) {
+    return (top_surf(Reader, index_quad) || bottom_surf(Reader, index_quad) || front_surf(Reader, index_quad) || back_surf(Reader, index_quad));
 }
 
 // Boundary for Nodes
@@ -240,11 +230,23 @@ void store_2d_vector_in_file(std::string filename, vector<vector<double>>& array
     myfile.close();
 }
 
+void store_2d_vector_in_file(std::string filename, vector<vector<double>>& array_to_store, int lines_to_take) {
+    ofstream myfile;
+    myfile.open(filename + ".txt");
+    for (int i = 0; i < lines_to_take; i++) {
+        for (int j = 0; j < lines_to_take; j++) {
+            myfile << array_to_store[i][j] << ' ';
+        }
+        myfile << endl;
+    }
+    myfile.close();
+}
+
 int main() {
 
     // Read mesh in file, prepare result writer
     Mesh Reader;
-    Reader.MeshReaderMSH("Mesh/mesh_6x6x6.msh");
+    Reader.MeshReaderMSH("Mesh/mesh_10x10x10.msh");
 
     XML_Writer Writer("results/", "Temperature");
 
@@ -290,21 +292,23 @@ int main() {
     MBuild.build_vector(Reader, F, IntegrateF, f_function);
 
     // Neumann BC
-    std::cout << "Neumann BC " << std::endl;
-    std::vector<double> params_neumann = { 0.0 };
-    Boundary_Vector_Integral3D Neumann_integrator;
-    MBuild.neumann_BC(Reader, F, Neumann_integrator, Neumann_BC_negx, left_surf, params_neumann);
-    MBuild.neumann_BC(Reader, F, Neumann_integrator, Neumann_BC_posx, right_surf, params_neumann);
-    MBuild.neumann_BC(Reader, F, Neumann_integrator, Neumann_BC_front, front_surf, params_neumann);
-    MBuild.neumann_BC(Reader, F, Neumann_integrator, Neumann_BC_back, back_surf, params_neumann);
-    //MBuild.neumann_BC(Reader, F, Neumann_integrator, Neumann_BC_top, top_surf, params_neumann);
+    //std::cout << "Neumann BC " << std::endl;
+    //std::vector<double> params_neumann = { 0.0 };
+    //Boundary_Vector_Integral3D Neumann_integrator;
+    //MBuild.neumann_BC(Reader, F, Neumann_integrator, Neumann_insulation, insulation_bound, params_neumann);
+    //MBuild.neumann_BC(Reader, F, Neumann_integrator, Neumann_in_flux, left_surf, params_neumann);
+
+    //// Robin BC
+    //std::cout << "Robin BC " << std::endl;
+    //std::vector<double> params_robin = { 0.0 };
+    //Boundary_Matrix_Integral3D Robin_integrator;
+    //MBuild.robin_BC(Reader, F, K, Neumann_integrator, Robin_integrator, \
+    //    Robin_vector, Robin_matrix, right_surf, params_robin);
 
     
     // Put F into previous F vector
     std::copy(F.begin(), F.end(), F_previous.begin());
-
-
-    store_1d_vector_in_file("results/F", F);
+    //store_1d_vector_in_file("results/F", F);
 
     // Reset F vector before next time step
     std::fill(F.begin(), F.end(), 0.0);
@@ -316,82 +320,71 @@ int main() {
     MBuild.build_matrix(Reader, C, IntegrateC, C_function);
 
 
-    store_2d_vector_in_file("results/C", C);
-    store_2d_vector_in_file("results/K", K);
+    store_2d_vector_in_file("results/C", C, 10);
+    store_2d_vector_in_file("results/K", K, 10);
 
 
-    // Dirichlet boundary imposition
-    std::vector<double> params_dirichlet = { 0.0 };
-    //MBuild.dirichlet_BC(Reader, K, F_previous, u0_fct, params_dirichlet, all_boundary);
-    MBuild.dirichlet_BC(Reader, K, F_previous, u0_fct, params_dirichlet, bottom_top);
+    //// Dirichlet boundary imposition
+    //std::vector<double> params_dirichlet = { 0.0 };
+    ////MBuild.dirichlet_BC(Reader, K, F_previous, u0_fct, params_dirichlet, all_boundary);
+    //MBuild.dirichlet_BC(Reader, K, F_previous, u0_fct, params_dirichlet, bottom_top);
 
 
-    Solver.solve_system(K, F_previous, dP);
+    //Solver.solve_system(K, F_previous, dP);
 
-    store_1d_vector_in_file("results/T", dP);
-    store_1d_vector_in_binary_file("results/T", dP);
-    Writer.Write_time_step(Reader, 1.0, "T", dP);
+    //store_1d_vector_in_file("results/T", dP);
+    //store_1d_vector_in_binary_file("results/T", dP);
+    //Writer.Write_time_step(Reader, 1.0, "T", dP);
 
-    //// First, we calculate the initial condition at t=0
-    //MBuild.build_initial_T(Reader, dP_previous, T0);
-    //store_1d_vector_in_file(path_storage + "result_step_0", dP_previous);
-
-    // Then we loop on each timestep
-    //for (int i = 0; i < n_time; i++) {
-    //    double t = (i + 1) * dt;
-
-    //    cout << "Timestep t = " << t << endl;
-
-    //    std::vector<std::vector<double>> A_matrix(n_dof, std::vector<double>(n_dof));
-    //    std::vector<double> b_vector(n_dof);
-    //    std::vector<double> params_for_fct = { t , Lconv_vector[i + 1] };
-
-    //    MBuild.build_vector(Reader, F, IntegrateF, f_function);
+    // First, we calculate the initial condition at t=0
+    MBuild.build_initial_T(Reader, dP_previous, T0);
+    Writer.Write_time_step(Reader, 0, "T", dP_previous);
+    store_1d_vector_in_binary_file("results/T0", dP_previous);
 
 
+    for (int i = 0; i < n_time; i++) {
+        double t = (i + 1) * dt; // Time in seconds
+        std::cout << "Timestep t = " << t << " s" << endl;
 
-    //    build_A_matrix(A_matrix);
-    //    build_b_vector(b_vector);
+        std::vector<std::vector<double>> A_matrix(n_dof, std::vector<double>(n_dof));
+        std::vector<double> b_vector(n_dof);
+        
+        std::cout << "Build force vector" << std::endl;
+        MBuild.build_vector(Reader, F, IntegrateF, f_function);
+        
+        // Because K and C are constant
+        build_A_matrix(A_matrix);
+        build_b_vector(b_vector);
 
-    //    // Neumann boundary imposition
-    //    cout << "Neumann BC ";
-    //    Boundary_Vector_Integral3D Neumann_integrator;
-    //    //MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, neumann_BC_fct, left_boundary, params_for_fct);
-    //    //store_1d_vector_in_file("F", F);
+        // Neumann BC
+        std::cout << "Neumann BC " << std::endl;
+        std::vector<double> params_neumann = { t };
+        Boundary_Vector_Integral3D Neumann_integrator;
+        MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, Neumann_insulation, insulation_bound, params_neumann);
+        MBuild.neumann_BC(Reader, b_vector, Neumann_integrator, Neumann_in_flux, left_surf, params_neumann);
 
-    //    // Robin boundary imposition
-    //    cout << "Robin BC ";
-    //    Boundary_Matrix_Integral3D Robin_integrator;
-    //    // Top boundary
-    //    //MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
-    //    //    Robin_BC_vect_fct_top, Robin_BC_mat_fct_top, top_boundary, params_for_fct);
-    //    //// Right boundary
-    //    //MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
-    //    //    Robin_BC_vect_fct_right, Robin_BC_mat_fct_right, right_boundary, params_for_fct);
-    //    //// Bottom boundary
-    //    //MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
-    //    //    Robin_BC_vect_fct_bottom, Robin_BC_mat_fct_bottom, bottom_boundary, params_for_fct);
+        // Robin BC
+        std::cout << "Robin BC " << std::endl;
+        std::vector<double> params_robin = { 0.0 };
+        Boundary_Matrix_Integral3D Robin_integrator;
+        MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
+            Robin_vector, Robin_matrix, right_surf, params_robin);
 
-    //    // Dirichlet boundary imposition
-    //    //MBuild.dirichlet_BC(Reader, A_matrix, b_vector, u0_fct, params_dirichlet, left_boundary_node);
-
-    //    params_for_fct.clear();
-
-    //    Solver.solve_system(A_matrix, b_vector, dP);
-    //    //store_1d_vector_in_file("b", b_vector);
-    //    //store_2d_vector_in_file("A", A_matrix);
+        std::cout << "Solving system" << std::endl;
+        Solver.solve_system_Cholesky(A_matrix, b_vector, dP);
 
 
-    //    A_matrix.clear();
-    //    b_vector.clear();
+        A_matrix.clear();
+        b_vector.clear();
 
-    //    store_1d_vector_in_file(path_storage + "/result_step_" + to_string(i + 1), dP);
-    //    Writer.Write_time_step(Reader, t, "T", dP);
+        Writer.Write_time_step(Reader, t, "T", dP);
+        store_1d_vector_in_binary_file("results/T"+std::to_string(i+1), dP_previous);
 
-    //    dP_previous.swap(dP);
-    //    F_previous.swap(F);
-    //    std::fill(F.begin(), F.end(), 0.0);
-    //}
+
+        dP_previous.swap(dP);
+        F_previous.swap(F);
+        std::fill(F.begin(), F.end(), 0.0);
+    }
 
     return 0;
 };

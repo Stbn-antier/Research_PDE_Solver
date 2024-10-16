@@ -1,36 +1,36 @@
 #include "Integrals_3D.h"
 
-const double gauss_point = 1 / sqrt(3);
+//const double gauss_point = 1 / sqrt(3);
+//
+//std::vector<std::vector<double>> gauss_points_2D{
+//{-gauss_point, -gauss_point},
+//{-gauss_point, +gauss_point},
+//{+gauss_point, +gauss_point},
+//{+gauss_point, -gauss_point}
+//};
+//std::vector<std::vector<double>> gauss_points_3D{
+//{-gauss_point, -gauss_point, -gauss_point},
+//{+gauss_point, -gauss_point, -gauss_point},
+//{+gauss_point, +gauss_point, -gauss_point},
+//{-gauss_point, +gauss_point, -gauss_point},
+//{-gauss_point, -gauss_point, +gauss_point},
+//{+gauss_point, -gauss_point, +gauss_point},
+//{+gauss_point, +gauss_point, +gauss_point},
+//{-gauss_point, +gauss_point, +gauss_point},
+//};
 
-std::vector<std::vector<double>> gauss_points_2D{
-{-gauss_point, -gauss_point},
-{-gauss_point, +gauss_point},
-{+gauss_point, +gauss_point},
-{+gauss_point, -gauss_point}
-};
-std::vector<std::vector<double>> gauss_points_3D{
-{-gauss_point, -gauss_point, -gauss_point},
-{+gauss_point, -gauss_point, -gauss_point},
-{+gauss_point, +gauss_point, -gauss_point},
-{-gauss_point, +gauss_point, -gauss_point},
-{-gauss_point, -gauss_point, +gauss_point},
-{+gauss_point, -gauss_point, +gauss_point},
-{+gauss_point, +gauss_point, +gauss_point},
-{-gauss_point, +gauss_point, +gauss_point},
-};
-
-double Volume_Matrix_Integral3D::Evaluate_Integrand(std::vector<double>& coord_master, std::vector<std::vector<double>>& coord_deformed, int ind_i, int ind_j, Shape_fct_3D& Shape, integrand_function3D f)
+double Volume_Matrix_Integral3D::Evaluate_Integrand(int gauss_idx, std::vector<std::vector<double>>& coord_deformed, int ind_i, int ind_j, Shape_fct_3D& Shape, integrand_function3D f)
 {
-	return f(Shape.Coordinates_deformed(coord_master, coord_deformed, 0), Shape.Coordinates_deformed(coord_master, coord_deformed, 1), Shape.Coordinates_deformed(coord_master, coord_deformed, 2))\
-		* Shape.Evaluate(coord_master, ind_i) * Shape.Evaluate(coord_master, ind_j)\
-		* abs(Shape.JacobianDeterminant(coord_master, coord_deformed));
+	return f(Shape.Coordinates_deformed(gauss_points_3D[gauss_idx], coord_deformed, 0), Shape.Coordinates_deformed(gauss_points_3D[gauss_idx], coord_deformed, 1), Shape.Coordinates_deformed(gauss_points_3D[gauss_idx], coord_deformed, 2))\
+		* Shape.Evaluate(gauss_points_3D[gauss_idx], ind_i) * Shape.Evaluate(gauss_points_3D[gauss_idx], ind_j)\
+		* abs(Shape.JacobianDeterminant(gauss_idx));
 }
 
 double Volume_Matrix_Integral3D::Gaussian_Quadrature(int ind_i, int ind_j, std::vector<std::vector<double>>& coord_deformed, Shape_fct_3D& Shape, integrand_function3D f)
 {
 	double total = 0;
-	for (int i = 0; i < Shape.n_nodes; i++) {
-		total += Evaluate_Integrand(gauss_points_3D[i], coord_deformed, ind_i, ind_j, Shape, f);
+	for (int k = 0; k < Shape.n_nodes; k++) {
+		total += Evaluate_Integrand(k, coord_deformed, ind_i, ind_j, Shape, f);
 	}
 	return total;
 }
@@ -55,17 +55,17 @@ double Boundary_Vector_Integral3D::Gaussian_Quadrature(int ind_i, std::vector<st
 	return total;
 }
 
-double Volume_Vector_Integral3D::Evaluate_Integrand(std::vector<double>& coord_master, std::vector<std::vector<double>>& coord_deformed, int ind_i, Shape_fct_3D& Shape, integrand_function3D f)
+double Volume_Vector_Integral3D::Evaluate_Integrand(int gauss_idx, std::vector<std::vector<double>>& coord_deformed, int ind_i, Shape_fct_3D& Shape, integrand_function3D f)
 {
-	return f(Shape.Coordinates_deformed(coord_master, coord_deformed, 0), Shape.Coordinates_deformed(coord_master, coord_deformed, 1), Shape.Coordinates_deformed(coord_master, coord_deformed, 2))\
-		* Shape.Evaluate(coord_master, ind_i) * abs(Shape.JacobianDeterminant(coord_master, coord_deformed));
+	return f(Shape.Coordinates_deformed(gauss_points_3D[gauss_idx], coord_deformed, 0), Shape.Coordinates_deformed(gauss_points_3D[gauss_idx], coord_deformed, 1), Shape.Coordinates_deformed(gauss_points_3D[gauss_idx], coord_deformed, 2))\
+		* Shape.Evaluate(gauss_points_3D[gauss_idx], ind_i) * abs(Shape.JacobianDeterminant(gauss_idx));
 }
 
 double Volume_Vector_Integral3D::Gaussian_Quadrature(int ind_i, std::vector<std::vector<double>>& coord_deformed, Shape_fct_3D& Shape, integrand_function3D f)
 {
 	double total = 0;
-	for (int i = 0; i < Shape.n_nodes; i++) {
-		total += Evaluate_Integrand(gauss_points_3D[i], coord_deformed, ind_i, Shape, f);
+	for (int k = 0; k < Shape.n_nodes; k++) {
+		total += Evaluate_Integrand(k, coord_deformed, ind_i, Shape, f);
 	}
 	return total;
 }
@@ -92,8 +92,8 @@ double Boundary_Matrix_Integral3D::Gaussian_Quadrature(int ind_i, int ind_j, std
 double Volume_Inner_grad_Integral3D::Gaussian_Quadrature(int ind_i, int ind_j, std::vector<std::vector<double>>& coord_deformed, Shape_fct_3D& Shape, integrand_function3D f)
 {
 	double total = 0;
-	for (int i = 0; i < Shape.n_nodes; i++) {
-		total += Shape.InnerProdGrad(gauss_points_3D[i], coord_deformed, ind_i, ind_j, f);
+	for (int k = 0; k < Shape.n_nodes; k++) {
+		total += Shape.InnerProdGrad(coord_deformed, k, ind_i, ind_j, f);
 	}
 	return total;
 }

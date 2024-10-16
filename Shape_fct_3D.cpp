@@ -1,6 +1,49 @@
 #include "Shape_fct_3D.h"
 #pragma once
 
+void Shape_fct_3D::build_jacobian(std::vector<std::vector<double>>& coord_deformed)
+{
+    for (int k = 0; k < 8; k++) {
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                jacobian[k][3 * i + j] = Jacobian(gauss_points_3D[k], coord_deformed, i, j);
+            }
+        }
+    }
+}
+
+void Shape_fct_3D::build_jacobian_det(std::vector<std::vector<double>>& coord_deformed)
+{
+    for (int k = 0; k < 8; k++) {
+        jacobian_det[k] = \
+              jacobian[k][3*0 + 0] * (jacobian[k][3*1 + 1] * jacobian[k][3*2 + 2] - jacobian[k][3*1 + 2] * jacobian[k][3*2 + 1])\
+            - jacobian[k][3*0 + 1] * (jacobian[k][3*1 + 0] * jacobian[k][3*2 + 2] - jacobian[k][3*1 + 2] * jacobian[k][3*2 + 0])\
+            + jacobian[k][3*0 + 2] * (jacobian[k][3*1 + 0] * jacobian[k][3*2 + 1] - jacobian[k][3*1 + 1] * jacobian[k][3*2 + 0]);
+    }
+}
+
+void Shape_fct_3D::build_jacobian_invert(std::vector<std::vector<double>>& coord_deformed)
+{
+    for (int k = 0; k < 8; k++) {
+        jacobian_invert[k][0] = +(jacobian[k][3 * 1 + 1] * jacobian[k][3 * 2 + 2] - jacobian[k][3 * 2 + 1] * jacobian[k][3 * 1 + 2]) / jacobian_det[k];
+        jacobian_invert[k][1] = -(jacobian[k][3 * 1 + 0] * jacobian[k][3 * 2 + 2] - jacobian[k][3 * 2 + 0] * jacobian[k][3 * 1 + 2]) / jacobian_det[k];
+        jacobian_invert[k][2] = +(jacobian[k][3 * 1 + 0] * jacobian[k][3 * 2 + 1] - jacobian[k][3 * 2 + 0] * jacobian[k][3 * 1 + 1]) / jacobian_det[k];
+        jacobian_invert[k][3] = -(jacobian[k][3 * 0 + 1] * jacobian[k][3 * 2 + 2] - jacobian[k][3 * 2 + 1] * jacobian[k][3 * 0 + 2]) / jacobian_det[k];
+        jacobian_invert[k][4] = +(jacobian[k][3 * 0 + 0] * jacobian[k][3 * 2 + 2] - jacobian[k][3 * 2 + 0] * jacobian[k][3 * 0 + 2]) / jacobian_det[k];
+        jacobian_invert[k][5] = -(jacobian[k][3 * 0 + 0] * jacobian[k][3 * 2 + 1] - jacobian[k][3 * 2 + 0] * jacobian[k][3 * 0 + 1]) / jacobian_det[k];
+        jacobian_invert[k][6] = +(jacobian[k][3 * 0 + 1] * jacobian[k][3 * 1 + 2] - jacobian[k][3 * 1 + 1] * jacobian[k][3 * 0 + 2]) / jacobian_det[k];
+        jacobian_invert[k][7] = -(jacobian[k][3 * 0 + 0] * jacobian[k][3 * 1 + 2] - jacobian[k][3 * 1 + 0] * jacobian[k][3 * 0 + 2]) / jacobian_det[k];
+        jacobian_invert[k][8] = +(jacobian[k][3 * 0 + 0] * jacobian[k][3 * 1 + 1] - jacobian[k][3 * 1 + 0] * jacobian[k][3 * 0 + 1]) / jacobian_det[k];
+    }
+}
+
+Shape_fct_3D::Shape_fct_3D(std::vector<std::vector<double>>& coord_deformed)
+{
+    build_jacobian(coord_deformed);
+    build_jacobian_det(coord_deformed);
+    build_jacobian_invert(coord_deformed);
+}
+
 double Shape_fct_3D::Evaluate(std::vector<double> coord_master, int index)
 {
     switch (index)
@@ -148,14 +191,15 @@ double Shape_fct_3D::EvaluateDerivativeMaster(std::vector<double> coord_master, 
     }
 }
 
-double Shape_fct_3D::EvaluateDerivativeDeformed(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int index, int derivation_index)
+double Shape_fct_3D::EvaluateDerivativeDeformed(int gauss_idx, int index, int derivation_index)
 {
     if (derivation_index > dim) {
         throw std::overflow_error("Index of derivation " + std::to_string(index) + " too large.");
     }
     double total = 0;
     for (int i = 0; i < dim; i++) {
-        total += JacobianInvert(coord_master, coord_deformed, derivation_index, i) * EvaluateDerivativeMaster(coord_master, index, i);
+        total += JacobianInvert(gauss_idx, derivation_index, i) * EvaluateDerivativeMaster(gauss_points_3D[gauss_idx], index, i);
+        //total += JacobianInvert(coord_master, coord_deformed, derivation_index, i) * EvaluateDerivativeMaster(coord_master, index, i);
     }
     return total;
 }
@@ -170,69 +214,69 @@ double Shape_fct_3D::Jacobian(std::vector<double> coord_master, std::vector<std:
     return total;
 }
 
-double Shape_fct_3D::JacobianDeterminant(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed)
-{
-    return Jacobian(coord_master, coord_deformed, 0, 0) * \
-        (Jacobian(coord_master, coord_deformed, 1, 1) * Jacobian(coord_master, coord_deformed, 2, 2)\
-            - Jacobian(coord_master, coord_deformed, 1, 2) * Jacobian(coord_master, coord_deformed, 2, 1))\
-        - Jacobian(coord_master, coord_deformed, 0, 1) * \
-        (Jacobian(coord_master, coord_deformed, 1, 0) * Jacobian(coord_master, coord_deformed, 2, 2)\
-            - Jacobian(coord_master, coord_deformed, 1, 2) * Jacobian(coord_master, coord_deformed, 2, 0))\
-        + Jacobian(coord_master, coord_deformed, 0, 2) * \
-        (Jacobian(coord_master, coord_deformed, 1, 0) * Jacobian(coord_master, coord_deformed, 2, 1)\
-            - Jacobian(coord_master, coord_deformed, 1, 1) * Jacobian(coord_master, coord_deformed, 2, 0));
-}
+//double Shape_fct_3D::JacobianDeterminant(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed)
+//{
+//    return Jacobian(coord_master, coord_deformed, 0, 0) * \
+//        (Jacobian(coord_master, coord_deformed, 1, 1) * Jacobian(coord_master, coord_deformed, 2, 2)\
+//            - Jacobian(coord_master, coord_deformed, 1, 2) * Jacobian(coord_master, coord_deformed, 2, 1))\
+//        - Jacobian(coord_master, coord_deformed, 0, 1) * \
+//        (Jacobian(coord_master, coord_deformed, 1, 0) * Jacobian(coord_master, coord_deformed, 2, 2)\
+//            - Jacobian(coord_master, coord_deformed, 1, 2) * Jacobian(coord_master, coord_deformed, 2, 0))\
+//        + Jacobian(coord_master, coord_deformed, 0, 2) * \
+//        (Jacobian(coord_master, coord_deformed, 1, 0) * Jacobian(coord_master, coord_deformed, 2, 1)\
+//            - Jacobian(coord_master, coord_deformed, 1, 1) * Jacobian(coord_master, coord_deformed, 2, 0));
+//}
 
-double Shape_fct_3D::JacobianInvert(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int line, int column)
-{
-    if (line >= dim || column >= dim) {
-        throw std::overflow_error("Index of JacobianInvert out of range : " + std::to_string((line > column ? line : column)));
-    }
-    double determinant = JacobianDeterminant(coord_master, coord_deformed);
-    if (line == 0 && column == 0) {
-        return +(Jacobian(coord_master, coord_deformed, 1, 1) * Jacobian(coord_master, coord_deformed, 2, 2)\
-            - Jacobian(coord_master, coord_deformed, 2, 1) * Jacobian(coord_master, coord_deformed, 1, 2)) / determinant;
-    }
-    else if (line == 0 && column == 1) {
-        return -(Jacobian(coord_master, coord_deformed, 1, 0) * Jacobian(coord_master, coord_deformed, 2, 2)\
-            - Jacobian(coord_master, coord_deformed, 2, 0) * Jacobian(coord_master, coord_deformed, 1, 2)) / determinant;
-    }
-    else if (line == 0 && column == 2) {
-        return +(Jacobian(coord_master, coord_deformed, 1, 0) * Jacobian(coord_master, coord_deformed, 2, 1)\
-            - Jacobian(coord_master, coord_deformed, 2, 0) * Jacobian(coord_master, coord_deformed, 1, 1)) / determinant;
-    }
-    else if (line == 1 && column == 0) {
-        return -(Jacobian(coord_master, coord_deformed, 0, 1) * Jacobian(coord_master, coord_deformed, 2, 2)\
-            - Jacobian(coord_master, coord_deformed, 2, 1) * Jacobian(coord_master, coord_deformed, 0, 2)) / determinant;
-    }
-    else if (line == 1 && column == 1) {
-        return +(Jacobian(coord_master, coord_deformed, 0, 0) * Jacobian(coord_master, coord_deformed, 2, 2)\
-            - Jacobian(coord_master, coord_deformed, 2, 0) * Jacobian(coord_master, coord_deformed, 0, 2)) / determinant;
-    }
-    else if (line == 1 && column == 2) {
-        return -(Jacobian(coord_master, coord_deformed, 0, 0) * Jacobian(coord_master, coord_deformed, 2, 1)\
-            - Jacobian(coord_master, coord_deformed, 2, 0) * Jacobian(coord_master, coord_deformed, 0, 1)) / determinant;
-    }
-    else if (line == 2 && column == 0) {
-        return +(Jacobian(coord_master, coord_deformed, 0, 1) * Jacobian(coord_master, coord_deformed, 1, 2)\
-            - Jacobian(coord_master, coord_deformed, 1, 1) * Jacobian(coord_master, coord_deformed, 0, 2)) / determinant;
-    }
-    else if (line == 2 && column == 1) {
-        return -(Jacobian(coord_master, coord_deformed, 0, 0) * Jacobian(coord_master, coord_deformed, 1, 2)\
-            - Jacobian(coord_master, coord_deformed, 1, 0) * Jacobian(coord_master, coord_deformed, 0, 2)) / determinant;
-    }
-    else if (line == 2 && column == 2) {
-        return +(Jacobian(coord_master, coord_deformed, 0, 0) * Jacobian(coord_master, coord_deformed, 1, 1)\
-            - Jacobian(coord_master, coord_deformed, 1, 0) * Jacobian(coord_master, coord_deformed, 0, 1)) / determinant;
-    }
-    return -1000000;
-}
+//double Shape_fct_3D::JacobianInvert(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int line, int column)
+//{
+//    if (line >= dim || column >= dim) {
+//        throw std::overflow_error("Index of JacobianInvert out of range : " + std::to_string((line > column ? line : column)));
+//    }
+//    double determinant = JacobianDeterminant(coord_master, coord_deformed);
+//    if (line == 0 && column == 0) {
+//        return +(Jacobian(coord_master, coord_deformed, 1, 1) * Jacobian(coord_master, coord_deformed, 2, 2)\
+//            - Jacobian(coord_master, coord_deformed, 2, 1) * Jacobian(coord_master, coord_deformed, 1, 2)) / determinant;
+//    }
+//    else if (line == 0 && column == 1) {
+//        return -(Jacobian(coord_master, coord_deformed, 1, 0) * Jacobian(coord_master, coord_deformed, 2, 2)\
+//            - Jacobian(coord_master, coord_deformed, 2, 0) * Jacobian(coord_master, coord_deformed, 1, 2)) / determinant;
+//    }
+//    else if (line == 0 && column == 2) {
+//        return +(Jacobian(coord_master, coord_deformed, 1, 0) * Jacobian(coord_master, coord_deformed, 2, 1)\
+//            - Jacobian(coord_master, coord_deformed, 2, 0) * Jacobian(coord_master, coord_deformed, 1, 1)) / determinant;
+//    }
+//    else if (line == 1 && column == 0) {
+//        return -(Jacobian(coord_master, coord_deformed, 0, 1) * Jacobian(coord_master, coord_deformed, 2, 2)\
+//            - Jacobian(coord_master, coord_deformed, 2, 1) * Jacobian(coord_master, coord_deformed, 0, 2)) / determinant;
+//    }
+//    else if (line == 1 && column == 1) {
+//        return +(Jacobian(coord_master, coord_deformed, 0, 0) * Jacobian(coord_master, coord_deformed, 2, 2)\
+//            - Jacobian(coord_master, coord_deformed, 2, 0) * Jacobian(coord_master, coord_deformed, 0, 2)) / determinant;
+//    }
+//    else if (line == 1 && column == 2) {
+//        return -(Jacobian(coord_master, coord_deformed, 0, 0) * Jacobian(coord_master, coord_deformed, 2, 1)\
+//            - Jacobian(coord_master, coord_deformed, 2, 0) * Jacobian(coord_master, coord_deformed, 0, 1)) / determinant;
+//    }
+//    else if (line == 2 && column == 0) {
+//        return +(Jacobian(coord_master, coord_deformed, 0, 1) * Jacobian(coord_master, coord_deformed, 1, 2)\
+//            - Jacobian(coord_master, coord_deformed, 1, 1) * Jacobian(coord_master, coord_deformed, 0, 2)) / determinant;
+//    }
+//    else if (line == 2 && column == 1) {
+//        return -(Jacobian(coord_master, coord_deformed, 0, 0) * Jacobian(coord_master, coord_deformed, 1, 2)\
+//            - Jacobian(coord_master, coord_deformed, 1, 0) * Jacobian(coord_master, coord_deformed, 0, 2)) / determinant;
+//    }
+//    else if (line == 2 && column == 2) {
+//        return +(Jacobian(coord_master, coord_deformed, 0, 0) * Jacobian(coord_master, coord_deformed, 1, 1)\
+//            - Jacobian(coord_master, coord_deformed, 1, 0) * Jacobian(coord_master, coord_deformed, 0, 1)) / determinant;
+//    }
+//    return -1000000;
+//}
 
-double Shape_fct_3D::InnerProdGrad(std::vector<double> coord_master, std::vector<std::vector<double>> coord_deformed, int ind_i, int ind_j, integrand_function3D f)
+double Shape_fct_3D::InnerProdGrad(std::vector<std::vector<double>>& coord_deformed, int gauss_idx, int ind_i, int ind_j, integrand_function3D f)
 {
-    return f(Coordinates_deformed(coord_master, coord_deformed, 0), Coordinates_deformed(coord_master, coord_deformed, 1), Coordinates_deformed(coord_master, coord_deformed, 2))\
-        * ((EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_i, 0) * EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_j, 0))\
-        + (EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_i, 1) * EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_j, 1))\
-        + (EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_i, 2) * EvaluateDerivativeDeformed(coord_master, coord_deformed, ind_j, 2)))\
-        * abs(JacobianDeterminant(coord_master, coord_deformed));
+    return f(Coordinates_deformed(gauss_points_3D[gauss_idx], coord_deformed, 0), Coordinates_deformed(gauss_points_3D[gauss_idx], coord_deformed, 1), Coordinates_deformed(gauss_points_3D[gauss_idx], coord_deformed, 2))\
+        * ((EvaluateDerivativeDeformed(gauss_idx, ind_i, 0) * EvaluateDerivativeDeformed(gauss_idx, ind_j, 0))\
+        + (EvaluateDerivativeDeformed(gauss_idx, ind_i, 1) * EvaluateDerivativeDeformed(gauss_idx, ind_j, 1))\
+        + (EvaluateDerivativeDeformed(gauss_idx, ind_i, 2) * EvaluateDerivativeDeformed(gauss_idx, ind_j, 2)))\
+        * abs(JacobianDeterminant(gauss_idx));
 }

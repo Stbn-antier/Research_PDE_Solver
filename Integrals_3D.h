@@ -5,6 +5,7 @@
 #include "Shape_functions.h"
 #include "Shape_fct_3D.h"
 #include "Aliases.h"
+//#include "Gaussian_points.h"
 
 
 class Volume_Matrix_Integral3D
@@ -14,7 +15,7 @@ class Volume_Matrix_Integral3D
     // Used in the left-handside damping terms
     //
 public:
-    double Evaluate_Integrand(std::vector<double>& coord_master, std::vector<std::vector<double>>& coord_deformed, \
+    double Evaluate_Integrand(int gauss_idx, std::vector<std::vector<double>>& coord_deformed, \
         int ind_i, int ind_j, Shape_fct_3D& Shape, integrand_function3D f);
     virtual double Gaussian_Quadrature(int ind_i, int ind_j, std::vector<std::vector<double>>& coord_deformed, \
         Shape_fct_3D& Shape, integrand_function3D f);
@@ -40,7 +41,7 @@ class Volume_Vector_Integral3D
     // Used in the righthand-side source term
     //
 public:
-    double Evaluate_Integrand(std::vector<double>& coord_master, std::vector<std::vector<double>>& coord_deformed, \
+    double Evaluate_Integrand(int gauss_idx, std::vector<std::vector<double>>& coord_deformed, \
         int ind_i, Shape_fct_3D& Shape, integrand_function3D f);
     double Gaussian_Quadrature(int ind_i, std::vector<std::vector<double>>& coord_deformed, \
         Shape_fct_3D& Shape, integrand_function3D f);

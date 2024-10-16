@@ -2,14 +2,15 @@
 
 void Matrix_Builder3D::build_matrix(Mesh& Reader, std::vector<std::vector<double>>& A, Volume_Matrix_Integral3D& Integration, integrand_function3D f)
 {
-    Shape_fct_3D ShapeFcts;
-
     for (int c = 0; c < Reader.num_Elems["hexa"]; c++) {
         // Building vector of coordinates of element
         vector<vector<double>> coords_element;
-        for (int k = 0; k < ShapeFcts.n_nodes; k++) {
+        for (int k = 0; k < Reader.node_per_hexa; k++) {
             coords_element.push_back(Reader.Nodes[Reader.Elems["hexa"][c].Nodes[k]]);
         }
+
+        Shape_fct_3D ShapeFcts(coords_element);
+
         // Assembling the stiffness matrix for element c
         for (int i = 0; i < ShapeFcts.n_nodes; i++) {
             for (int j = 0; j < ShapeFcts.n_nodes; j++) {
@@ -25,14 +26,15 @@ void Matrix_Builder3D::build_matrix(Mesh& Reader, std::vector<std::vector<double
 
 void Matrix_Builder3D::build_vector(Mesh& Reader, std::vector<double>& a, Volume_Vector_Integral3D& Integration, integrand_function3D f)
 {
-    Shape_fct_3D ShapeFcts;
-
     for (int c = 0; c < Reader.num_Elems["hexa"]; c++) {
         // Building vector of coordinates of element
         vector<vector<double>> coords_element;
-        for (int k = 0; k < ShapeFcts.n_nodes; k++) {
+        for (int k = 0; k < Reader.node_per_hexa; k++) {
             coords_element.push_back(Reader.Nodes[Reader.Elems["hexa"][c].Nodes[k]]);
         }
+
+        Shape_fct_3D ShapeFcts(coords_element);
+
         // Assembling the force vector for element c
         for (int i = 0; i < ShapeFcts.n_nodes; i++) {
             a[Reader.Elems["hexa"][c].Nodes[i]] += Integration.Gaussian_Quadrature(i, coords_element, ShapeFcts, f);
@@ -116,7 +118,7 @@ void Matrix_Builder3D::robin_BC(Mesh& Reader, std::vector<double>& f_vector, std
     //
     Shape_functions ShapeFct2D;
 
-    for (int c = 0; c < Reader.num_Elems["line"]; c++) {
+    for (int c = 0; c < Reader.num_Elems["quad"]; c++) {
         // If for selecting the boundary on which to apply the neumann BC
         if (on_bound(Reader, c)) {
             vector<vector<double>> coords_element;

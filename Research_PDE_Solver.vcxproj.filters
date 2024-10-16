@@ -122,6 +122,9 @@
     <ClInclude Include="Writer.h">
       <Filter>Header Files\Output</Filter>
     </ClInclude>
+    <ClInclude Include="Gaussian_points.h">
+      <Filter>Header Files\Matrix_handling</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="custom_mesh.msh">

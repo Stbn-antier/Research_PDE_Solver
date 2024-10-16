@@ -1,6 +1,6 @@
 #include "Solve_matrix_system.h"
 
-void Solve_matrix_system::solve_system(std::vector<std::vector<double>>& A_matrix, std::vector<double>& b_vector, std::vector<double>& dP) {
+void Solve_matrix_system::solve_system_LU(std::vector<std::vector<double>>& A_matrix, std::vector<double>& b_vector, std::vector<double>& dP) {
     int dof = A_matrix.size();
 
     std::vector<std::vector<double>> L(dof, std::vector<double>(dof)); // lower matrix
@@ -55,4 +55,71 @@ void Solve_matrix_system::solve_system(std::vector<std::vector<double>>& A_matri
     L.clear();
     U.clear();
     Z.clear();
+}
+
+void Solve_matrix_system::solve_system_Cholesky(std::vector<std::vector<double>>& A_matrix, std::vector<double>& b_vector, std::vector<double>& dP)
+{
+    int dof = A_matrix.size();
+
+    std::vector<double> L(dof*(dof+1)/2); // lower triangle matrix
+    // Under this storage, element at index (i,j) of L is located in L[i*(i+1)/2 + j]
+    std::vector<double> D(dof); // diagonal matrix
+    std::vector<double> Y(dof); // auxiliary vector
+
+    std::fill(dP.begin(), dP.end(), 0.0);
+
+    // Initialize L:=I, diagonal equal to 1
+    for (int i = 0; i < dof; i++) {
+        L[i * (i + 1) / 2 + i] = 1;
+    }
+
+    // Calculate coefficients of D and L
+    for (int j = 0; j < dof; j++) {
+        double acc = 0;
+        for (int k = 0; k < j; k++) {
+            acc += L[j * (j + 1) / 2 + k] * L[j * (j + 1) / 2 + k] * D[k];
+        }
+
+        D[j] = A_matrix[j][j] - acc;
+
+        for (int i = j + 1; i < dof; i++) {
+            double acc = 0;
+            for (int k = 0; k < j; k++) {
+                acc += L[i * (i + 1) / 2 + k] * L[j * (j + 1) / 2 + k] * D[k];
+            }
+
+            L[i * (i + 1) / 2 + j] = (A_matrix[i][j] - acc) / D[j];
+        }
+    }
+
+    // Solve first intermediate system b = L Y'
+    for (int i = 0; i < dof; i++)
+    {
+        double acc = 0.0;
+        for (int j = 0; j < i; j++) {
+            acc += L[i*(i+1)/2 + j] * Y[j];
+        }
+
+        Y[i] = b_vector[i] - acc;
+    }
+
+    // Solve second intermediate system Y' = D Y
+    for (int i = 0; i < dof; i++) {
+        Y[i] /= D[i];
+    }
+
+    // Solve final system Y = L^T Dp
+    for (int i = dof - 1; i >= 0; i--)
+    {
+        double acc = 0.0;
+        for (int j = i; j < dof; j++) {
+            acc += L[j * (j + 1) / 2 + i] * dP[j];
+        }
+
+        dP[i] = (Y[i] - acc) / L[i*(i+1)/2 + i];
+    }
+
+    L.clear();
+    D.clear();
+    Y.clear();
 }
