@@ -71,3 +71,22 @@ void XML_Writer::Write_time_step(Mesh& Reader, double time, std::string data_nam
 	xmlfile << "</Attribute>" << std::endl;
 	xmlfile << "</Grid>" << std::endl;
 }
+
+void XML_Writer::Write_time_step(Mesh& Reader, double time, std::string data_name, DataVector& data)
+{
+	// For writing scalar steps at nodes
+	xmlfile << "<Grid Name=\"mesh\" GridType=\"Uniform\">" << std::endl;
+	Write_topology_data(Reader);
+	Write_geometry_data(Reader);
+	xmlfile << "<Time Value=\"" + std::to_string(time) + "\" />" << std::endl;
+	xmlfile << "<Attribute Name=\"" + data_name + "\" AttributeType=\"Scalar\" Center =\"Node\">" << std::endl;
+	xmlfile << "<DataItem Dimensions=\"" + std::to_string(Reader.num_nodes) + " 1\" Format=\"XML\">" << std::endl;
+	// Write data
+	for (int i = 0; i < Reader.num_nodes; i++) {
+		xmlfile << std::to_string(data[i]) << std::endl;
+	}
+
+	xmlfile << "</DataItem>" << std::endl;
+	xmlfile << "</Attribute>" << std::endl;
+	xmlfile << "</Grid>" << std::endl;
+}

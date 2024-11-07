@@ -123,3 +123,109 @@ void Solve_matrix_system::solve_system_Cholesky(std::vector<std::vector<double>>
     D.clear();
     Y.clear();
 }
+
+void Solve_matrix_system::sparse_Cholesky(CSRMatrix& A)
+{
+    CSCMatrix B;
+    CSR_to_CSC(A, B);
+    sparse_Cholesky(B);
+
+    CSRMatrix temp_res;
+    CSC_to_CSR(B, temp_res);
+    A = temp_res;
+}
+
+void Solve_matrix_system::sparse_Cholesky(CSCMatrix& Res)
+{
+    assert(Res.n_col == Res.n_row); // Only works for square matrix n*n
+    int n = Res.n_col; // size of square matrix
+
+    for (int col = 0; col < n; col++) {
+        int row_start = Res.colptr[col];
+        int row_end = Res.colptr[col + 1];
+
+        assert(Res.rowind[row_start] == col); // If failed, Res is not col-row sorted !
+
+        // Divide column col by sqrt of diagonal coefficient
+        double diag_coef_sqrt = std::sqrt(Res.values[row_start]);
+        for (int i = row_start; i < row_end; i++) {
+            Res.values[i] /= diag_coef_sqrt;
+        }
+
+        // For values (i,j) where j>col, i>=j, (i,j) -= (i,col)*(j,col) if they all exist
+        for (int j = col + 1; j < n; j++) {
+            int j_row_start = Res.colptr[j];
+            int j_row_end = Res.colptr[j + 1];
+            for (int i_id = j_row_start; i_id < j_row_end; i_id++) {
+                int i = Res.rowind[i_id];
+
+                double val1 = 0;
+                double val2 = 0;
+                // Check through column col if (i, col) and (j, col) exist
+                for (int col_i = row_start; col_i < row_end; col_i++) {
+                    // Check if (i,col) exist and put value (i,col) in val1
+                    if (Res.rowind[col_i] == i) {
+                        val1 = Res.values[col_i];
+                    }
+                    // Check if (j,col) exist and put value (j,col) in val2
+                    if (Res.rowind[col_i] == j) {
+                        val2 = Res.values[col_i];
+                    }
+                }
+
+                // Finally do (i,j) -= (i,col)*(j,col)
+                Res.values[i_id] -= val1 * val2;
+            }
+        }
+    }
+}
+
+DataVector Solve_matrix_system::PCCG(CSRMatrix& A, DataVector& b, bool log_err, int max_it, double tol)
+{
+    // Vector keeping error during execution
+    std::vector<double> error(max_it);
+
+
+    // First calculate the preconditioning L with Incomplete Cholesky
+    CSRMatrix L(A);
+    sparse_Cholesky(L);
+
+    // First guess for solution x=0
+    DataVector x(b.size());
+    DataVector residue = b - (A * x);
+    error[0] = residue.norm();
+    DataVector z = Solve_conditioning(L, residue);
+    DataVector p = z;
+
+    for (int k = 0; k < max_it - 1; k++) {
+        double alpha = (residue ^ z) / (p ^ (A * p));
+        x += alpha * p;
+        DataVector r_next = residue - alpha * (A * p);
+
+        double err_r = r_next.norm();
+        error[k + 1] = err_r;
+        if (err_r < tol) {
+            error.resize(k + 2);
+            break;
+        }
+
+        DataVector z_next = Solve_conditioning(L, r_next);
+        double beta = (r_next ^ z_next) / (residue ^ z);
+        DataVector p_next = z_next + beta * p;
+
+        residue = r_next;
+        z = z_next;
+        p = p_next;
+    }
+
+    if (log_err) {
+        std::ofstream myfile;
+        myfile.open("error.txt");
+        for (int i = 0; i < error.size(); i++) {
+            myfile << error[i] << std::endl;
+        }
+        myfile.close();
+    }
+
+    return x;
+}

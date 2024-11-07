@@ -13,20 +13,21 @@
 #include "Integrals_3D.h"
 #include "Matrix_Assembly_3D.h"
 #include "Writer.h"
+#include "Matrix.h"
 
 using namespace std;
 
 const double t_fin = 10; // Final time of simulation
-const double n_time = 50; // Number of time steps not including t=0
+const int n_time = 50; // Number of time steps not including t=0
 const double dt = t_fin / n_time; // time step
 
-std::vector<std::vector<double>> K; // Stiffness matrix
-std::vector<double> F; // Force vector
-std::vector<double> F_previous; // Force vector
-std::vector<double> dP; // Solution vector
-std::vector<double> dP_previous; // Solution vector at time t-1
-
-std::vector<std::vector<double>> C; // Damping matrix for time stepping
+//std::vector<std::vector<double>> K; // Stiffness matrix
+//std::vector<double> F; // Force vector
+//std::vector<double> F_previous; // Force vector
+//std::vector<double> dP; // Solution vector
+//std::vector<double> dP_previous; // Solution vector at time t-1
+//
+//std::vector<std::vector<double>> C; // Damping matrix for time stepping
 
 //---------------------------------------------
 // Constants for the different functions
@@ -198,29 +199,38 @@ static bool bottom_top(Mesh& Reader, int index_node) {
 //---------------------------------------------
 
 
-void build_A_matrix(std::vector<std::vector<double>>& A_matrix) {
-    int len = A_matrix.size();
+//void build_A_matrix(std::vector<std::vector<double>>& A_matrix) {
+//    int len = A_matrix.size();
+//
+//    for (int i = 0; i < len; i++) {
+//        for (int j = 0; j < len; j++) {
+//            A_matrix[i][j] = C[i][j] + dt * K[i][j] / 2;
+//        }
+//    }
+//}
 
-    for (int i = 0; i < len; i++) {
-        for (int j = 0; j < len; j++) {
-            A_matrix[i][j] = C[i][j] + dt * K[i][j] / 2;
-        }
-    }
-}
-
-void build_b_vector(std::vector<double>& b_vector) {
-    double len = b_vector.size();
-
-    for (int i = 0; i < len; i++) {
-        for (int j = 0; j < len; j++) {
-            b_vector[i] += (C[i][j] - dt * K[i][j] / 2) * dP_previous[j];
-        }
-        b_vector[i] += dt * (F_previous[i] + F[i]) / 2;
-    }
-}
+//void build_b_vector(std::vector<double>& b_vector) {
+//    double len = b_vector.size();
+//
+//    for (int i = 0; i < len; i++) {
+//        for (int j = 0; j < len; j++) {
+//            b_vector[i] += (C[i][j] - dt * K[i][j] / 2) * dP_previous[j];
+//        }
+//        b_vector[i] += dt * (F_previous[i] + F[i]) / 2;
+//    }
+//}
 
 // Functions for storing data in files
 void store_1d_vector_in_file(std::string filename, vector<double>& array_to_store) {
+    ofstream myfile;
+    myfile.open(filename + ".txt");
+    for (int i = 0; i < array_to_store.size(); i++) {
+        myfile << array_to_store[i] << endl;
+    }
+    myfile.close();
+}
+
+void store_1d_vector_in_file(std::string filename, DataVector& array_to_store) {
     ofstream myfile;
     myfile.open(filename + ".txt");
     for (int i = 0; i < array_to_store.size(); i++) {
@@ -233,6 +243,13 @@ void store_1d_vector_in_binary_file(std::string filename, vector<double>& array_
     std::ofstream myfile(filename + ".bin", std::ios::binary);
     myfile.write(reinterpret_cast<const char*>(array_to_store.data()), array_to_store.size() * sizeof(double));
     
+    myfile.close();
+}
+
+void store_1d_vector_in_binary_file(std::string filename, DataVector& array_to_store) {
+    std::ofstream myfile(filename + ".bin", std::ios::binary);
+    myfile.write(reinterpret_cast<const char*>(array_to_store.data_vec()), array_to_store.size() * sizeof(double));
+
     myfile.close();
 }
 
@@ -297,12 +314,20 @@ int main() {
     // Resize matrix to hold data
     int n_dof = Reader.num_nodes;
 
-    K.resize(n_dof, std::vector<double>(n_dof)); // Stiffness matrix
-    F.resize(n_dof); // Force vector
-    F_previous.resize(n_dof); // Force vector
-    dP.resize(n_dof); // Solution vector
-    dP_previous.resize(n_dof); // Solution vector at time t-1
-    C.resize(n_dof, std::vector<double>(n_dof)); // Damping matrix for time stepping
+    //K.resize(n_dof, std::vector<double>(n_dof)); // Stiffness matrix
+    //F.resize(n_dof); // Force vector
+    //F_previous.resize(n_dof); // Force vector
+    //dP.resize(n_dof); // Solution vector
+    //dP_previous.resize(n_dof); // Solution vector at time t-1
+    //C.resize(n_dof, std::vector<double>(n_dof)); // Damping matrix for time stepping
+
+    COOMatrix K(true);
+    COOMatrix C(true);
+
+    DataVector F(n_dof);
+    DataVector F_previous(n_dof);
+    DataVector dP(n_dof);
+    DataVector dP_previous(n_dof);
 
     std::vector<double> T_C(n_time + 1); // Storing the values of temperature at center
     //std::cout << Reader.Nodes[3381][0] << " " << Reader.Nodes[3381][1] << " " << Reader.Nodes[3381][2] << std::endl;
@@ -340,8 +365,12 @@ int main() {
     MBuild.build_matrix(Reader, C, IntegrateC, C_function);
 
 
-    store_2d_vector_in_file("results/C", C, 10);
-    store_2d_vector_in_file("results/K", K, 10);
+    //store_2d_vector_in_file("results/C", C, 10);
+    //store_2d_vector_in_file("results/K", K, 10);
+
+    // Make C and K into CSR Matrices
+    CSRMatrix K_CSR(K);
+    CSRMatrix C_CSR(C);
 
 
     // First, we calculate the initial condition at t=0
@@ -358,15 +387,16 @@ int main() {
         std::cout << "Timestep t = " << t << " s" << std::endl;
         cout << "Random number : " << rnd_vector[i + 1] << " Associated ynb : " << y_nb << std::endl;
 
-        std::vector<std::vector<double>> A_matrix(n_dof, std::vector<double>(n_dof));
-        std::vector<double> b_vector(n_dof);
+        //std::vector<std::vector<double>> A_matrix(n_dof, std::vector<double>(n_dof));
+        //std::vector<double> b_vector(n_dof);
         
         std::cout << "Build force vector" << std::endl;
         MBuild.build_vector(Reader, F, IntegrateF, f_function);
         
         // Because K and C are constant
-        build_A_matrix(A_matrix);
-        build_b_vector(b_vector);
+        COOMatrix A_matrix(C_CSR + dt/2 * K_CSR);
+        DataVector b_vector = (C_CSR - dt/2 * K_CSR)*dP_previous + dt/2*(F + F_previous);
+        
 
         // Neumann BC
         Boundary_Vector_Integral3D Neumann_integrator;
@@ -383,11 +413,16 @@ int main() {
             Robin_vector, Robin_matrix, all_surf, params_robin);
 
         std::cout << "Solving system" << std::endl;
-        Solver.solve_system_Cholesky(A_matrix, b_vector, dP);
+        //Solver.solve_system_Cholesky(A_matrix, b_vector, dP);
+
+        CSRMatrix A_CSR(A_matrix);
+        std::cout << A_CSR.nnz << std::endl;
+
+        dP = Solver.PCCG(A_CSR, b_vector);
 
 
-        A_matrix.clear();
-        b_vector.clear();
+        //A_matrix.clear();
+        //b_vector.clear();
 
         Writer.Write_time_step(Reader, t, "T", dP);
         store_1d_vector_in_binary_file("results/T"+std::to_string(i+1), dP);
