@@ -12,5 +12,6 @@ public:
 	void sparse_Cholesky(CSRMatrix& A_matrix);
 	void sparse_Cholesky(CSCMatrix& A_matrix);
 	DataVector PCCG(CSRMatrix& A, DataVector& b, bool log_err = false, int max_it = 5000, double tol = 1e-10);
+	DataVector PCCG(CSRMatrix& A, DataVector& b, DataVector& x0_init, bool log_err = false, int max_it = 5000, double tol = 1e-10);
 };
 

@@ -40,10 +40,15 @@ const double T_ext = 300; // Outside temperature in K
 const double T_0 = 1100; // Initial temperature in K
 
 const double hconv = 730; // Convective heat coeff
-const double hnb = 15000; // Nucleation boiling heat transfer
+//const double hnb = 15000; // Nucleation boiling heat transfer
 const double hfb = 100; // Heat transfer with oil vapor
 
+double hnb_list[3] = { 10000 , 15000 , 20000 };
+double Lnb_list[3] = { 0.005 , 0.01 , 0.015 };
+double Vconv_list[3] = { 0.02 , 0.03 , 0.04 }; // Speed of the nucleation bubbling layer displacement
+
 const double stand_dev = 0.005; // Standard deviation of the gaussian distribution used
+const int num_loops = 100;
 
 //---------------------------------------------
 
@@ -75,6 +80,7 @@ static double f_function(double x, double y, double z) {
 static double h(double x, double y, double z, std::vector<double>& params) {
     // Params vector stores information for planes at the boundary
     // params[0] -> n1x, params[1] -> n1y, params[2] -> d1, params[3] -> n2x, params[4] -> n2y, params[5] -> d2
+    // params[6] -> hnb
     double above1 = params[0] * x + params[1] * y + z - params[2];
     double above2 = params[3] * x + params[4] * y + z - params[5];
     // If above1>0, we are "above" plane 1, same for above2>0 and plane 2
@@ -86,13 +92,9 @@ static double h(double x, double y, double z, std::vector<double>& params) {
         return hfb;
     }
     else {
-        return hnb;
+        return params[6];
     }
 }
-
-//static double u0_fct(double x, double y, double z, std::vector<double>& params) {
-//    return 0;
-//}
 
 // Boundary condition functions
 
@@ -198,28 +200,6 @@ static bool bottom_top(Mesh& Reader, int index_node) {
 
 //---------------------------------------------
 
-
-//void build_A_matrix(std::vector<std::vector<double>>& A_matrix) {
-//    int len = A_matrix.size();
-//
-//    for (int i = 0; i < len; i++) {
-//        for (int j = 0; j < len; j++) {
-//            A_matrix[i][j] = C[i][j] + dt * K[i][j] / 2;
-//        }
-//    }
-//}
-
-//void build_b_vector(std::vector<double>& b_vector) {
-//    double len = b_vector.size();
-//
-//    for (int i = 0; i < len; i++) {
-//        for (int j = 0; j < len; j++) {
-//            b_vector[i] += (C[i][j] - dt * K[i][j] / 2) * dP_previous[j];
-//        }
-//        b_vector[i] += dt * (F_previous[i] + F[i]) / 2;
-//    }
-//}
-
 // Functions for storing data in files
 void store_1d_vector_in_file(std::string filename, vector<double>& array_to_store) {
     ofstream myfile;
@@ -277,6 +257,8 @@ void store_2d_vector_in_file(std::string filename, vector<vector<double>>& array
     myfile.close();
 }
 
+//---------------------------------------------------------------
+
 int main() {
     // RNG setup
     std::random_device rd{};
@@ -284,18 +266,21 @@ int main() {
 
     std::normal_distribution<double> gauss{ 0, stand_dev };
     auto random_float = [&gen, &gauss] {return gauss(gen); };
+    std::vector<std::vector<double>> random_process(num_loops, std::vector<double>(n_time));
+    for (int i = 0; i < n_time; i++) {
+        for (int j = 0; j < num_loops; j++) {
+            random_process[j][i] = random_float();
+        }
+    }
+    store_2d_vector_in_file("results/random_process", random_process);
 
     // Read mesh in file, prepare result writer
     Mesh Reader;
     Reader.MeshReaderMSH("Mesh/mesh_3d_quench.msh");
 
-    XML_Writer Writer("results/", "Temperature");
-
     // Matrix incremental builder, and solver
     Matrix_Builder3D MBuild;
-
     Solve_matrix_system Solver;
-
 
     // Check if version is right
     cout << "File version : " << Reader.file_version << endl;
@@ -310,131 +295,114 @@ int main() {
     //     cout << Reader.Elems["quad"][i].Nodes[0] << " " << Reader.Elems["quad"][i].Nodes[1] << " " << Reader.Elems["quad"][i].Nodes[2] << " " << Reader.Elems["quad"][i].Nodes[3] << endl;
     // }
     cout << "Number of boundary elements : " << Reader.num_Elems["quad"] << endl;
-
-    // Resize matrix to hold data
+    
+    // Create vectors and matrices to hold data
     int n_dof = Reader.num_nodes;
-
-    //K.resize(n_dof, std::vector<double>(n_dof)); // Stiffness matrix
-    //F.resize(n_dof); // Force vector
-    //F_previous.resize(n_dof); // Force vector
-    //dP.resize(n_dof); // Solution vector
-    //dP_previous.resize(n_dof); // Solution vector at time t-1
-    //C.resize(n_dof, std::vector<double>(n_dof)); // Damping matrix for time stepping
-
     COOMatrix K(true);
     COOMatrix C(true);
 
-    DataVector F(n_dof);
-    DataVector F_previous(n_dof);
-    DataVector dP(n_dof);
-    DataVector dP_previous(n_dof);
-
-    std::vector<double> T_C(n_time + 1); // Storing the values of temperature at center
-    //std::cout << Reader.Nodes[3381][0] << " " << Reader.Nodes[3381][1] << " " << Reader.Nodes[3381][2] << std::endl;
-    // for 10x10x40 mesh Center of sample is node 3381
-
-    std::vector<double> rnd_vector(n_time + 1); // Storage for the realizations of random
-    for (int i = 0; i < n_time; i++) {
-        double additional_param = random_float();
-        rnd_vector[i + 1] = additional_param;
-    }
-    store_1d_vector_in_file("results/rnd_vector", rnd_vector);
-
-
-
-    // Building constant matrixes and vectors
+    // Building stiffness and damping matrices
     cout << "Building stiffness matrix" << endl;
     Volume_Inner_grad_Integral3D IntegrateK;
     MBuild.build_matrix(Reader, K, IntegrateK, K_function);
 
-    cout << "Building force vector" << endl;
-    Volume_Vector_Integral3D IntegrateF;
-    MBuild.build_vector(Reader, F, IntegrateF, f_function);
-    
-    // Put F into previous F vector
-    std::copy(F.begin(), F.end(), F_previous.begin());
-    //store_1d_vector_in_file("results/F", F);
-
-    // Reset F vector before next time step
-    std::fill(F.begin(), F.end(), 0.0);
-
-    // For time dependent problems
-    // Precomputing the constant matrices C and K
     cout << "Computing damping matrix" << endl;
     Volume_Matrix_Integral3D IntegrateC;
     MBuild.build_matrix(Reader, C, IntegrateC, C_function);
 
-
-    //store_2d_vector_in_file("results/C", C, 10);
-    //store_2d_vector_in_file("results/K", K, 10);
+    Volume_Vector_Integral3D IntegrateF;
 
     // Make C and K into CSR Matrices
     CSRMatrix K_CSR(K);
     CSRMatrix C_CSR(C);
 
 
-    // First, we calculate the initial condition at t=0
-    MBuild.build_initial_T(Reader, dP_previous, T0);
-    T_C[0] = dP_previous[3381];
-    Writer.Write_time_step(Reader, 0, "T", dP_previous);
-    store_1d_vector_in_binary_file("results/T0", dP_previous);
+    for (int i_h = 0; i_h < 3; i_h++) {
+        for (int i_L = 0; i_L < 3; i_L++) {
+            for (int i_Ldot = 0; i_Ldot < 3; i_Ldot++) {
+                for (int i_loop = 0; i_loop < num_loops; i_loop++) {
+                    std::string path_storage = "results/loop_" + to_string(i_h * 9 * num_loops + i_L * 3 * num_loops + i_Ldot * num_loops + i_loop + 1) + "/";
+                    std::filesystem::create_directory(path_storage);
 
-    double y_nb = 0;
-    for (int i = 0; i < n_time; i++) {
-        double t = (i + 1) * dt; // Time in seconds
-        y_nb += 0.03 * dt + rnd_vector[i + 1];
+                    // We set the parameters for now:
+                    double hnb = hnb_list[i_h];
+                    double Lnb = Lnb_list[i_L];
+                    double Vconv = Vconv_list[i_Ldot];
 
-        std::cout << "Timestep t = " << t << " s" << std::endl;
-        cout << "Random number : " << rnd_vector[i + 1] << " Associated ynb : " << y_nb << std::endl;
+                    // Vectors for solving
+                    DataVector F(n_dof);
+                    DataVector F_previous(n_dof);
+                    DataVector dP(n_dof);
+                    DataVector dP_previous(n_dof);
 
-        //std::vector<std::vector<double>> A_matrix(n_dof, std::vector<double>(n_dof));
-        //std::vector<double> b_vector(n_dof);
-        
-        std::cout << "Build force vector" << std::endl;
-        MBuild.build_vector(Reader, F, IntegrateF, f_function);
-        
-        // Because K and C are constant
-        COOMatrix A_matrix(C_CSR + dt/2 * K_CSR);
-        DataVector b_vector = (C_CSR - dt/2 * K_CSR)*dP_previous + dt/2*(F + F_previous);
-        
+                    std::vector<double> T_C(n_time + 1); // Storing the values of temperature at center
+                    //std::cout << Reader.Nodes[3381][0] << " " << Reader.Nodes[3381][1] << " " << Reader.Nodes[3381][2] << std::endl;
+                    // for 10x10x40 mesh Center of sample is node 3381
 
-        // Neumann BC
-        Boundary_Vector_Integral3D Neumann_integrator;
-
-        // Robin BC
-        std::cout << "Robin BC " << std::endl;
-        // Params vector stores information for planes at the boundary
-        // params[0] -> n1x, params[1] -> n1y, params[2] -> d1, params[3] -> n2x, params[4] -> n2y, params[5] -> d2
-        double n1x = -0.5 + 2 * t / t_fin;
-        double n2y = -0.5 + 2 * t / t_fin;
-        std::vector<double> params_robin = { n1x, 0, y_nb, 0, n2y, y_nb+0.01 };
-        Boundary_Matrix_Integral3D Robin_integrator;
-        MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
-            Robin_vector, Robin_matrix, all_surf, params_robin);
-
-        std::cout << "Solving system" << std::endl;
-        //Solver.solve_system_Cholesky(A_matrix, b_vector, dP);
-
-        CSRMatrix A_CSR(A_matrix);
-        std::cout << A_CSR.nnz << std::endl;
-
-        dP = Solver.PCCG(A_CSR, b_vector);
+                    // Build force vector for timestep 0
+                    MBuild.build_vector(Reader, F, IntegrateF, f_function);
+                    // Put F into previous F vector
+                    std::copy(F.begin(), F.end(), F_previous.begin());
+                    // Reset F vector before next time step
+                    std::fill(F.begin(), F.end(), 0.0);
 
 
-        //A_matrix.clear();
-        //b_vector.clear();
+                    // First, we calculate the initial condition at t=0
+                    MBuild.build_initial_T(Reader, dP_previous, T0);
+                    T_C[0] = dP_previous[3381];
+                    store_1d_vector_in_binary_file(path_storage + "T0", dP_previous);
 
-        Writer.Write_time_step(Reader, t, "T", dP);
-        store_1d_vector_in_binary_file("results/T"+std::to_string(i+1), dP);
-        T_C[i+1] = dP[3381];
+                    std::vector<double> Lconv_vector(n_time + 1); // Storage for the realizations of random
+
+                    for (int i = 0; i < n_time; i++) {
+                        double t = (i + 1) * dt;
+                        double gaussian_number = random_process[i_loop][i];
+                        Lconv_vector[i + 1] = Lconv_vector[i] + dt * Vconv + gaussian_number;
+
+                        cout << "Loop number n=" << i_loop + 1 << "/" << num_loops << ", Timestep t = " << t << endl;
+                        cout << "Params : hnb=" << hnb << " Lnb=" << Lnb << " Vconv=" << Vconv << endl;
+                        cout << "Random number : " << gaussian_number << endl;
+
+                        std::cout << "Build force vector" << std::endl;
+                        MBuild.build_vector(Reader, F, IntegrateF, f_function);
+
+                        // Build A_matrix and b_vector
+                        COOMatrix A_matrix(C_CSR + dt / 2 * K_CSR);
+                        DataVector b_vector = (C_CSR - dt / 2 * K_CSR) * dP_previous + dt / 2 * (F + F_previous);
 
 
-        dP_previous.swap(dP);
-        F_previous.swap(F);
-        std::fill(F.begin(), F.end(), 0.0);
+                        // Robin BC
+                        std::cout << "Robin BC " << std::endl;
+                        // Params vector stores information for planes at the boundary
+                        // params[0] -> n1x, params[1] -> n1y, params[2] -> d1, params[3] -> n2x, params[4] -> n2y, params[5] -> d2, params[6] -> hnb
+                        std::vector<double> params_robin = { 0, 0, Lconv_vector[i + 1], 0, 0 , Lconv_vector[i + 1] + Lnb, hnb };
+                        Boundary_Vector_Integral3D Neumann_integrator;
+                        Boundary_Matrix_Integral3D Robin_integrator;
+                        MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
+                            Robin_vector, Robin_matrix, all_surf, params_robin);
+
+                        std::cout << "Solving system" << std::endl;
+                        // First convert from COO to CSR for solver
+                        CSRMatrix A_CSR(A_matrix);
+                        // Solve system with iterative PCCG solver
+                        dP = Solver.PCCG(A_CSR, b_vector, dP_previous);
+
+
+                        // Store solution
+                        store_1d_vector_in_binary_file(path_storage + "T" + std::to_string(i + 1), dP);
+                        T_C[i + 1] = dP[3381];
+
+
+                        dP_previous.swap(dP);
+                        F_previous.swap(F);
+                        std::fill(F.begin(), F.end(), 0.0);
+                    }
+                    store_1d_vector_in_file(path_storage + "Lconv", Lconv_vector);
+                    store_1d_vector_in_file(path_storage + "T_C", T_C);
+                }
+            }
+        }
     }
-
-    store_1d_vector_in_file("results/T_C", T_C);
 
     return 0;
 };

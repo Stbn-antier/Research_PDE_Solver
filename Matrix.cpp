@@ -275,6 +275,26 @@ void CSRMatrix::print_data(int n_line)
     }
 }
 
+void CSRMatrix::store_in_file(std::string filename)
+{
+    std::ofstream myfile;
+    myfile.open(filename + "_val.txt");
+    for (int i = 0; i < this->values.size(); i++) {
+        myfile << this->values[i] << std::endl;
+    }
+    myfile.close();
+    myfile.open(filename + "_colind.txt");
+    for (int i = 0; i < this->colind.size(); i++) {
+        myfile << this->colind[i] << std::endl;
+    }
+    myfile.close();
+    myfile.open(filename + "_rowptr.txt");
+    for (int i = 0; i < this->rowptr.size(); i++) {
+        myfile << this->rowptr[i] << std::endl;
+    }
+    myfile.close();
+}
+
 // For CSC Matrix
 
 CSCMatrix::CSCMatrix(bool is_sym)

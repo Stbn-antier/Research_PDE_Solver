@@ -147,9 +147,9 @@ void Solve_matrix_system::sparse_Cholesky(CSCMatrix& Res)
         assert(Res.rowind[row_start] == col); // If failed, Res is not col-row sorted !
 
         // Divide column col by sqrt of diagonal coefficient
-        double diag_coef_sqrt = std::sqrt(Res.values[row_start]);
+        double diag_coef_sqrt_invrt = 1/std::sqrt(Res.values[row_start]);
         for (int i = row_start; i < row_end; i++) {
-            Res.values[i] /= diag_coef_sqrt;
+            Res.values[i] *= diag_coef_sqrt_invrt;
         }
 
         // For values (i,j) where j>col, i>=j, (i,j) -= (i,col)*(j,col) if they all exist
@@ -192,6 +192,56 @@ DataVector Solve_matrix_system::PCCG(CSRMatrix& A, DataVector& b, bool log_err, 
 
     // First guess for solution x=0
     DataVector x(b.size());
+    DataVector residue = b - (A * x);
+    error[0] = residue.norm();
+    DataVector z = Solve_conditioning(L, residue);
+    DataVector p = z;
+
+    for (int k = 0; k < max_it - 1; k++) {
+        double alpha = (residue ^ z) / (p ^ (A * p));
+        x += alpha * p;
+        DataVector r_next = residue - alpha * (A * p);
+
+        double err_r = r_next.norm();
+        error[k + 1] = err_r;
+        if (err_r < tol) {
+            error.resize(k + 2);
+            break;
+        }
+
+        DataVector z_next = Solve_conditioning(L, r_next);
+        double beta = (r_next ^ z_next) / (residue ^ z);
+        DataVector p_next = z_next + beta * p;
+
+        residue = r_next;
+        z = z_next;
+        p = p_next;
+    }
+
+    if (log_err) {
+        std::ofstream myfile;
+        myfile.open("error.txt");
+        for (int i = 0; i < error.size(); i++) {
+            myfile << error[i] << std::endl;
+        }
+        myfile.close();
+    }
+
+    return x;
+}
+
+DataVector Solve_matrix_system::PCCG(CSRMatrix& A, DataVector& b, DataVector& x0_init, bool log_err, int max_it, double tol)
+{
+    // Vector keeping error during execution
+    std::vector<double> error(max_it);
+
+
+    // First calculate the preconditioning L with Incomplete Cholesky
+    CSRMatrix L(A);
+    sparse_Cholesky(L);
+
+    // First guess for solution x=0
+    DataVector x = x0_init;
     DataVector residue = b - (A * x);
     error[0] = residue.norm();
     DataVector z = Solve_conditioning(L, residue);

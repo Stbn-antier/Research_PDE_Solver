@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <tuple>
 #include <algorithm>
@@ -58,6 +59,7 @@ public:
 	CSRMatrix& operator= (CSRMatrix const& mat);
 	void print_data();
 	void print_data(int n_line);
+	void store_in_file(std::string filename);
 };
 
 class CSCMatrix {
