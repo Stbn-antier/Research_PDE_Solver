@@ -14,6 +14,7 @@
 #include "Matrix_Assembly_3D.h"
 #include "Writer.h"
 #include "Matrix.h"
+#include "Thread_pool.h"
 
 using namespace std;
 
@@ -39,18 +40,21 @@ const double Cp = 475; // Heat capacity in J/(kg.K)
 const double T_ext = 300; // Outside temperature in K
 const double T_0 = 1100; // Initial temperature in K
 
-//const double hconv = 730; // Convective heat coeff
-//const double hnb = 15000; // Nucleation boiling heat transfer
-//const double hfb = 100; // Heat transfer with oil vapor
+const double hconv = 730; // convective heat coeff
+const double hnb = 15000; // nucleation boiling heat transfer
+const double hfb = 100; // heat transfer with oil vapor
+const double Lnb = 0.01; // Length of nucleation boiling layer
 
-double hnb_list[3] = { 10000 , 15000 , 20000 };
-double hfb_list[3] = { 50 , 100 , 150 };
-double hconv_list[3] = { 365 , 730 , 1095 };
-double Lnb_list[3] = { 0.005 , 0.01 , 0.015 };
-double Vconv_list[3] = { 0.02 , 0.03 , 0.04 }; // Speed of the nucleation bubbling layer displacement
+//double hnb_list[3] = { 10000 , 15000 , 20000 };
+//double hfb_list[3] = { 50 , 100 , 150 };
+//double hconv_list[3] = { 365 , 730 , 1095 };
+//double Lnb_list[3] = { 0.005 , 0.01 , 0.015 };
+//double Vconv_list[3] = { 0.02 , 0.03 , 0.04 }; // Speed of the nucleation bubbling layer displacement
+double Vconv_list[5] = { 0.01 , 0.02 , 0.03 , 0.04 , 0.05 };
+double sigma_list[5] = { 0.001 , 0.002 , 0.003 , 0.004 , 0.005 };
 
 //const double stand_dev = 0.005; // Standard deviation of the gaussian distribution used
-//const int num_loops = 100;
+const int num_loops = 100;
 
 //---------------------------------------------
 
@@ -261,20 +265,135 @@ void store_2d_vector_in_file(std::string filename, vector<vector<double>>& array
 
 //---------------------------------------------------------------
 
+
+void one_case_loop(int i_Vconv, int i_sigma, int i_loop, int n_dof, Matrix_Builder3D& MBuild, Solve_matrix_system& Solver,\
+    Mesh& Reader, Volume_Vector_Integral3D& IntegrateF, std::vector<std::vector<double>>& random_process, CSRMatrix& C_CSR, CSRMatrix& K_CSR) {
+    
+    std::string path_storage = "results/loop_" + to_string(i_Vconv * 5 * 100 + i_sigma * 100 + i_loop + 1) + "/";
+    std::filesystem::create_directory(path_storage);
+
+    // We set the parameters for now:
+    double Vconv = Vconv_list[i_Vconv];
+    double sigma = sigma_list[i_sigma];
+
+    // Vectors for solving
+    DataVector F(n_dof);
+    DataVector F_previous(n_dof);
+    DataVector dP(n_dof);
+    DataVector dP_previous(n_dof);
+
+    std::vector<double> T_C(n_time + 1); // Storing the values of temperature at center
+    //std::cout << Reader.Nodes[3381][0] << " " << Reader.Nodes[3381][1] << " " << Reader.Nodes[3381][2] << std::endl;
+    // for 10x10x40 mesh Center of sample is node 3381
+
+    // Build force vector for timestep 0
+    MBuild.build_vector(Reader, F, IntegrateF, f_function);
+    // Put F into previous F vector
+    std::copy(F.begin(), F.end(), F_previous.begin());
+    // Reset F vector before next time step
+    std::fill(F.begin(), F.end(), 0.0);
+
+
+    // First, we calculate the initial condition at t=0
+    MBuild.build_initial_T(Reader, dP_previous, T0);
+    T_C[0] = dP_previous[3381];
+    store_1d_vector_in_binary_file(path_storage + "T0", dP_previous);
+
+    std::vector<double> Lconv_vector(n_time + 1); // Storage for the realizations of random
+
+    for (int i = 0; i < n_time; i++) {
+        double t = (i + 1) * dt;
+        double gaussian_number = random_process[i_loop + (i_sigma * 100)][i];
+        Lconv_vector[i + 1] = Lconv_vector[i] + dt * Vconv + gaussian_number;
+
+        std::cout << "Thread number " << std::this_thread::get_id() << std::endl;
+        cout << "Loop number n=" + to_string(i_Vconv * 5 * 100 + i_sigma * 100 + i_loop + 1) + "/2500, Timestep t = " << t << endl;
+        cout << "Params :  Vconv = " << Vconv << ", sigma = " << sigma << endl;
+
+        //std::cout << "Build force vector" << std::endl;
+        MBuild.build_vector(Reader, F, IntegrateF, f_function);
+
+        // Build A_matrix and b_vector
+        COOMatrix A_matrix(C_CSR + dt / 2 * K_CSR);
+        DataVector b_vector = (C_CSR - dt / 2 * K_CSR) * dP_previous + dt / 2 * (F + F_previous);
+
+
+        // Robin BC
+        //std::cout << "Robin BC " << std::endl;
+        // Params vector stores information for planes at the boundary
+        // params[0] -> n1x, params[1] -> n1y, params[2] -> d1, params[3] -> n2x, params[4] -> n2y, params[5] -> d2, params[6] -> hnb, params[7] -> hfb, params[8] -> hconv
+        std::vector<double> params_robin = { 0, 0, Lconv_vector[i + 1], 0, 0 , Lconv_vector[i + 1] + Lnb, hnb, hfb, hconv };
+        Boundary_Vector_Integral3D Neumann_integrator;
+        Boundary_Matrix_Integral3D Robin_integrator;
+        MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
+            Robin_vector, Robin_matrix, all_surf, params_robin);
+
+        //std::cout << "Solving system" << std::endl;
+        // First convert from COO to CSR for solver
+        CSRMatrix A_CSR(A_matrix);
+        // Solve system with iterative PCCG solver
+        dP = Solver.PCCG(A_CSR, b_vector, dP_previous);
+
+
+        // Store solution
+        store_1d_vector_in_binary_file(path_storage + "T" + std::to_string(i + 1), dP);
+        T_C[i + 1] = dP[3381];
+
+
+        dP_previous.swap(dP);
+        F_previous.swap(F);
+        std::fill(F.begin(), F.end(), 0.0);
+    }
+    store_1d_vector_in_file(path_storage + "Lconv", Lconv_vector);
+    store_1d_vector_in_file(path_storage + "T_C", T_C);
+}
+
+struct Loop {
+private:
+    std::shared_ptr<CSRMatrix> K_CSR_;
+    std::shared_ptr<CSRMatrix> C_CSR_;
+    std::shared_ptr<Matrix_Builder3D> MBuild_;
+    std::shared_ptr<Solve_matrix_system> Solver_;
+    std::shared_ptr<Mesh> Reader_;
+    std::shared_ptr<Volume_Vector_Integral3D> IntegrateF_;
+    std::shared_ptr<std::vector<std::vector<double>>> random_process_;
+
+    int i_Vconv_; int i_sigma_; int i_loop_; int n_dof_;
+
+public:
+    Loop(std::shared_ptr<CSRMatrix> K_CSR,
+        std::shared_ptr<CSRMatrix> C_CSR,
+        std::shared_ptr<Matrix_Builder3D> MBuild,
+        std::shared_ptr<Solve_matrix_system> Solver,
+        std::shared_ptr<Mesh> Reader,
+        std::shared_ptr<Volume_Vector_Integral3D> IntegrateF,
+        std::shared_ptr<std::vector<std::vector<double>>> random_process,
+        int i_Vconv, int i_sigma, int i_loop, int n_dof) : \
+        K_CSR_(K_CSR), C_CSR_(C_CSR), MBuild_(MBuild), Solver_(Solver), Reader_(Reader), IntegrateF_(IntegrateF), random_process_(random_process) {
+        i_Vconv_ = i_Vconv; i_sigma_ = i_sigma; i_loop_ = i_loop; n_dof_ = n_dof;
+    };
+    void operator()() {
+        one_case_loop(i_Vconv_, i_sigma_, i_loop_, n_dof_, *MBuild_, *Solver_, *Reader_, *IntegrateF_,* random_process_, *C_CSR_, *K_CSR_);
+    }
+};
+
 int main() {
     // RNG setup
     std::random_device rd{};
     std::mt19937 gen{ rd() };
 
-    /*std::normal_distribution<double> gauss{ 0, stand_dev };
-    auto random_float = [&gen, &gauss] {return gauss(gen); };
-    std::vector<std::vector<double>> random_process(num_loops, std::vector<double>(n_time));
-    for (int i = 0; i < n_time; i++) {
-        for (int j = 0; j < num_loops; j++) {
-            random_process[j][i] = random_float();
+    std::vector<std::vector<double>> random_process(num_loops*5, std::vector<double>(n_time));
+    for (int i_sigma = 0; i_sigma < 5; i_sigma++) {
+        double stand_dev = sigma_list[i_sigma] * std::sqrt(dt);
+        std::normal_distribution<double> gauss{ 0, stand_dev };
+        auto random_float = [&gen, &gauss] {return gauss(gen); };
+        for (int i = 0; i < n_time; i++) {
+            for (int j = 0; j < num_loops; j++) {
+                random_process[(i_sigma * 100) + j][i] = random_float();
+            }
         }
     }
-    store_2d_vector_in_file("results/random_process", random_process);*/
+    store_2d_vector_in_file("results/random_process", random_process);
 
     // Read mesh in file, prepare result writer
     Mesh Reader;
@@ -318,93 +437,26 @@ int main() {
     CSRMatrix K_CSR(K);
     CSRMatrix C_CSR(C);
 
+    // Initiate multithreading by tasks
+    std::cout << "Available threads : " << std::jthread::hardware_concurrency() << std::endl;
+    Thread_pool thr_pool;
 
-    for (int i_hnb = 0; i_hnb < 3; i_hnb++) {
-        for (int i_hfb = 0; i_hfb < 3; i_hfb++) {
-            for (int i_hconv = 0; i_hconv < 3; i_hconv++) {
-                for (int i_L = 0; i_L < 3; i_L++) {
-                    for (int i_Vconv = 0; i_Vconv < 3; i_Vconv++) {
-                        std::string path_storage = "results/loop_" + to_string(i_hnb * 81 + i_hfb * 27 + i_hconv * 9 + i_L * 3 + i_Vconv + 1) + "/";
-                        std::filesystem::create_directory(path_storage);
-
-                        // We set the parameters for now:
-                        double hnb = hnb_list[i_hnb];
-                        double hfb = hfb_list[i_hfb];
-                        double hconv = hconv_list[i_hconv];
-                        double Lnb = Lnb_list[i_L];
-                        double Vconv = Vconv_list[i_Vconv];
-
-                        // Vectors for solving
-                        DataVector F(n_dof);
-                        DataVector F_previous(n_dof);
-                        DataVector dP(n_dof);
-                        DataVector dP_previous(n_dof);
-
-                        std::vector<double> T_C(n_time + 1); // Storing the values of temperature at center
-                        //std::cout << Reader.Nodes[3381][0] << " " << Reader.Nodes[3381][1] << " " << Reader.Nodes[3381][2] << std::endl;
-                        // for 10x10x40 mesh Center of sample is node 3381
-
-                        // Build force vector for timestep 0
-                        MBuild.build_vector(Reader, F, IntegrateF, f_function);
-                        // Put F into previous F vector
-                        std::copy(F.begin(), F.end(), F_previous.begin());
-                        // Reset F vector before next time step
-                        std::fill(F.begin(), F.end(), 0.0);
+    // Share needed resources as shared pointers
+    auto SPtr_K_CSR = std::make_shared<CSRMatrix>(K_CSR);
+    auto SPtr_C_CSR = std::make_shared<CSRMatrix>(C_CSR);
+    auto SPtr_MBuild = std::make_shared<Matrix_Builder3D>(MBuild);
+    auto SPtr_Solver = std::make_shared<Solve_matrix_system>(Solver);
+    auto SPtr_Reader = std::make_shared<Mesh>(Reader);
+    auto SPtr_IntegrateF = std::make_shared<Volume_Vector_Integral3D>(IntegrateF);
+    auto SPtr_random_process = std::make_shared<std::vector<std::vector<double>>>(random_process);
 
 
-                        // First, we calculate the initial condition at t=0
-                        MBuild.build_initial_T(Reader, dP_previous, T0);
-                        T_C[0] = dP_previous[3381];
-                        store_1d_vector_in_binary_file(path_storage + "T0", dP_previous);
+    for (int i_Vconv = 0; i_Vconv < 5; i_Vconv++) {
+        for (int i_sigma = 0; i_sigma < 5; i_sigma++) {
+            for (int i_loop = 0; i_loop < num_loops; i_loop++) {
 
-                        std::vector<double> Lconv_vector(n_time + 1); // Storage for the realizations of random
-
-                        for (int i = 0; i < n_time; i++) {
-                            double t = (i + 1) * dt;
-                            //double gaussian_number = random_process[i_loop][i];
-                            Lconv_vector[i + 1] = Lconv_vector[i] + dt * Vconv;
-
-                            cout << "Loop number n=" + to_string(i_hnb * 81 + i_hfb * 27 + i_hconv * 9 + i_L * 3 + i_Vconv + 1) + "/" + std::to_string(int(pow(3,5))) << ", Timestep t = " << t << endl;
-                            cout << "Params : hnb=" << hnb << " hfb=" << hfb << " hconv = " << hconv << " Lnb = " << Lnb << " Vconv = " << Vconv << endl;
-
-                            std::cout << "Build force vector" << std::endl;
-                            MBuild.build_vector(Reader, F, IntegrateF, f_function);
-
-                            // Build A_matrix and b_vector
-                            COOMatrix A_matrix(C_CSR + dt / 2 * K_CSR);
-                            DataVector b_vector = (C_CSR - dt / 2 * K_CSR) * dP_previous + dt / 2 * (F + F_previous);
-
-
-                            // Robin BC
-                            std::cout << "Robin BC " << std::endl;
-                            // Params vector stores information for planes at the boundary
-                            // params[0] -> n1x, params[1] -> n1y, params[2] -> d1, params[3] -> n2x, params[4] -> n2y, params[5] -> d2, params[6] -> hnb, params[7] -> hfb, params[8] -> hconv
-                            std::vector<double> params_robin = { 0, 0, Lconv_vector[i + 1], 0, 0 , Lconv_vector[i + 1] + Lnb, hnb, hfb, hconv };
-                            Boundary_Vector_Integral3D Neumann_integrator;
-                            Boundary_Matrix_Integral3D Robin_integrator;
-                            MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
-                                Robin_vector, Robin_matrix, all_surf, params_robin);
-
-                            std::cout << "Solving system" << std::endl;
-                            // First convert from COO to CSR for solver
-                            CSRMatrix A_CSR(A_matrix);
-                            // Solve system with iterative PCCG solver
-                            dP = Solver.PCCG(A_CSR, b_vector, dP_previous);
-
-
-                            // Store solution
-                            store_1d_vector_in_binary_file(path_storage + "T" + std::to_string(i + 1), dP);
-                            T_C[i + 1] = dP[3381];
-
-
-                            dP_previous.swap(dP);
-                            F_previous.swap(F);
-                            std::fill(F.begin(), F.end(), 0.0);
-                        }
-                        store_1d_vector_in_file(path_storage + "Lconv", Lconv_vector);
-                        store_1d_vector_in_file(path_storage + "T_C", T_C);
-                    }
-                }
+                // Full loop as a task to do in parallel
+                thr_pool.enqueue(Loop(SPtr_K_CSR, SPtr_C_CSR, SPtr_MBuild, SPtr_Solver, SPtr_Reader, SPtr_IntegrateF, SPtr_random_process, i_Vconv, i_sigma, i_loop, n_dof));
             }
         }
     }

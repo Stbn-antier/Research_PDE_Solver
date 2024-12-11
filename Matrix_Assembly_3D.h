@@ -9,7 +9,7 @@
 class Matrix_Builder3D
 {
 private:
-	int report_steps = 4; // Report progress at every 1/report_step % of progress
+	int report_steps = 1; // Report progress at every 1/report_step % of progress
 public:
 	void build_matrix(Mesh& Reader, std::vector<std::vector<double>>& A, Volume_Matrix_Integral3D& Integration, integrand_function3D f);
 

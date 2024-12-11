@@ -18,9 +18,9 @@ void Matrix_Builder3D::build_matrix(Mesh& Reader, std::vector<std::vector<double
             }
         }
         coords_element.clear();
-        if ((c + 1) % (Reader.num_Elems["hexa"] / report_steps) == 0) {
+        /*if ((c + 1) % (Reader.num_Elems["hexa"] / report_steps) == 0) {
             std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["hexa"] << endl;
-        }
+        }*/
     }
 }
 
@@ -51,9 +51,9 @@ void Matrix_Builder3D::build_matrix(Mesh& Reader, COOMatrix& A, Volume_Matrix_In
             }
         }
         coords_element.clear();
-        if ((c + 1) % (Reader.num_Elems["hexa"] / report_steps) == 0) {
+        /*if ((c + 1) % (Reader.num_Elems["hexa"] / report_steps) == 0) {
             std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["hexa"] << endl;
-        }
+        }*/
     }
 }
 
@@ -73,9 +73,9 @@ void Matrix_Builder3D::build_vector(Mesh& Reader, std::vector<double>& a, Volume
             a[Reader.Elems["hexa"][c].Nodes[i]] += Integration.Gaussian_Quadrature(i, coords_element, ShapeFcts, f);
         }
         coords_element.clear();
-        if ((c + 1) % (Reader.num_Elems["hexa"] / report_steps) == 0) {
+        /*if ((c + 1) % (Reader.num_Elems["hexa"] / report_steps) == 0) {
             std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["hexa"] << endl;
-        }
+        }*/
     }
 }
 
@@ -95,9 +95,9 @@ void Matrix_Builder3D::build_vector(Mesh& Reader, DataVector& a, Volume_Vector_I
             a[Reader.Elems["hexa"][c].Nodes[i]] += Integration.Gaussian_Quadrature(i, coords_element, ShapeFcts, f);
         }
         coords_element.clear();
-        if ((c + 1) % (Reader.num_Elems["hexa"] / report_steps) == 0) {
+        /*if ((c + 1) % (Reader.num_Elems["hexa"] / report_steps) == 0) {
             std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["hexa"] << endl;
-        }
+        }*/
     }
 }
 
@@ -159,9 +159,9 @@ void Matrix_Builder3D::neumann_BC(Mesh& Reader, std::vector<double>& f_vector, B
             }
             coords_element.clear();
         }
-        if ((c + 1) % (Reader.num_Elems["quad"] / report_steps) == 0) {
+        /*if ((c + 1) % (Reader.num_Elems["quad"] / report_steps) == 0) {
             std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["quad"] << endl;
-        }
+        }*/
     }
 }
 
@@ -184,9 +184,9 @@ void Matrix_Builder3D::neumann_BC(Mesh& Reader, DataVector& f_vector, Boundary_V
             }
             coords_element.clear();
         }
-        if ((c + 1) % (Reader.num_Elems["quad"] / report_steps) == 0) {
+        /*if ((c + 1) % (Reader.num_Elems["quad"] / report_steps) == 0) {
             std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["quad"] << endl;
-        }
+        }*/
     }
 }
 
@@ -218,9 +218,9 @@ void Matrix_Builder3D::robin_BC(Mesh& Reader, std::vector<double>& f_vector, std
 
             coords_element.clear();
         }
-        if ((c + 1) % (Reader.num_Elems["quad"] / report_steps) == 0) {
+        /*if ((c + 1) % (Reader.num_Elems["quad"] / report_steps) == 0) {
             std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["quad"] << endl;
-        }
+        }*/
     }
 }
 
@@ -263,9 +263,9 @@ void Matrix_Builder3D::robin_BC(Mesh& Reader, DataVector& f_vector, COOMatrix& G
 
             coords_element.clear();
         }
-        if ((c + 1) % (Reader.num_Elems["quad"] / report_steps) == 0) {
+        /*if ((c + 1) % (Reader.num_Elems["quad"] / report_steps) == 0) {
             std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["quad"] << endl;
-        }
+        }*/
     }
 }
 
