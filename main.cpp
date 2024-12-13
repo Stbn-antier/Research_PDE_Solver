@@ -43,15 +43,14 @@ const double T_0 = 1100; // Initial temperature in K
 const double hconv = 730; // convective heat coeff
 const double hnb = 15000; // nucleation boiling heat transfer
 const double hfb = 100; // heat transfer with oil vapor
-const double Lnb = 0.01; // Length of nucleation boiling layer
+//const double Lnb = 0.01; // Length of nucleation boiling layer
 
 //double hnb_list[3] = { 10000 , 15000 , 20000 };
 //double hfb_list[3] = { 50 , 100 , 150 };
 //double hconv_list[3] = { 365 , 730 , 1095 };
-//double Lnb_list[3] = { 0.005 , 0.01 , 0.015 };
-//double Vconv_list[3] = { 0.02 , 0.03 , 0.04 }; // Speed of the nucleation bubbling layer displacement
-double Vconv_list[5] = { 0.01 , 0.02 , 0.03 , 0.04 , 0.05 };
-double sigma_list[5] = { 0.001 , 0.002 , 0.003 , 0.004 , 0.005 };
+double Lnb_list[3] = { 0.005 , 0.01 , 0.015 };
+double Vconv_list[3] = { 0.02 , 0.03 , 0.04 }; // Speed of the nucleation bubbling layer displacement
+double sigma_list[2] = { 0.001 , 0.005 };
 
 //const double stand_dev = 0.005; // Standard deviation of the gaussian distribution used
 const int num_loops = 100;
@@ -263,16 +262,30 @@ void store_2d_vector_in_file(std::string filename, vector<vector<double>>& array
     myfile.close();
 }
 
+void read_params_from_file(std::string name, std::vector<std::vector<double>>& params) {
+    std::ifstream myfile;
+    myfile.open(name);
+
+    std::string line;
+    while (getline(myfile, line)) {
+        double a; double b; double c;
+        istringstream iss(line);
+        iss >> a >> b >> c;
+        params.push_back(std::vector<double> { a, b, c });
+    }
+}
+
 //---------------------------------------------------------------
 
 
-void one_case_loop(int i_Vconv, int i_sigma, int i_loop, int n_dof, Matrix_Builder3D& MBuild, Solve_matrix_system& Solver,\
+void one_case_loop(int i_Lnb, int i_Vconv, int i_sigma, int i_loop, int n_dof, Matrix_Builder3D& MBuild, Solve_matrix_system& Solver,\
     Mesh& Reader, Volume_Vector_Integral3D& IntegrateF, std::vector<std::vector<double>>& random_process, CSRMatrix& C_CSR, CSRMatrix& K_CSR) {
     
-    std::string path_storage = "results/loop_" + to_string(i_Vconv * 5 * 100 + i_sigma * 100 + i_loop + 1) + "/";
+    std::string path_storage = "results/loop_" + to_string(i_Lnb * 600 + i_Vconv * 200 + i_sigma * 100 + i_loop + 1) + "/";
     std::filesystem::create_directory(path_storage);
 
     // We set the parameters for now:
+    double Lnb = Lnb_list[i_Lnb];
     double Vconv = Vconv_list[i_Vconv];
     double sigma = sigma_list[i_sigma];
 
@@ -307,8 +320,8 @@ void one_case_loop(int i_Vconv, int i_sigma, int i_loop, int n_dof, Matrix_Build
         Lconv_vector[i + 1] = Lconv_vector[i] + dt * Vconv + gaussian_number;
 
         std::cout << "Thread number " << std::this_thread::get_id() << std::endl;
-        cout << "Loop number n=" + to_string(i_Vconv * 5 * 100 + i_sigma * 100 + i_loop + 1) + "/2500, Timestep t = " << t << endl;
-        cout << "Params :  Vconv = " << Vconv << ", sigma = " << sigma << endl;
+        cout << "Loop number n=" + to_string(i_Lnb * 600 + i_Vconv * 200 + i_sigma * 100 + i_loop + 1) + "/1800, Timestep t = " << t << endl;
+        cout << "Params : Lnb = " << Lnb << ", Vconv = " << Vconv << ", sigma = " << sigma << endl;
 
         //std::cout << "Build force vector" << std::endl;
         MBuild.build_vector(Reader, F, IntegrateF, f_function);
@@ -358,7 +371,7 @@ private:
     std::shared_ptr<Volume_Vector_Integral3D> IntegrateF_;
     std::shared_ptr<std::vector<std::vector<double>>> random_process_;
 
-    int i_Vconv_; int i_sigma_; int i_loop_; int n_dof_;
+    int i_Lnb_; int i_Vconv_; int i_sigma_; int i_loop_; int n_dof_;
 
 public:
     Loop(std::shared_ptr<CSRMatrix> K_CSR,
@@ -368,12 +381,12 @@ public:
         std::shared_ptr<Mesh> Reader,
         std::shared_ptr<Volume_Vector_Integral3D> IntegrateF,
         std::shared_ptr<std::vector<std::vector<double>>> random_process,
-        int i_Vconv, int i_sigma, int i_loop, int n_dof) : \
+        int i_Lnb, int i_Vconv, int i_sigma, int i_loop, int n_dof) : \
         K_CSR_(K_CSR), C_CSR_(C_CSR), MBuild_(MBuild), Solver_(Solver), Reader_(Reader), IntegrateF_(IntegrateF), random_process_(random_process) {
-        i_Vconv_ = i_Vconv; i_sigma_ = i_sigma; i_loop_ = i_loop; n_dof_ = n_dof;
+        i_Lnb_ = i_Lnb;  i_Vconv_ = i_Vconv; i_sigma_ = i_sigma; i_loop_ = i_loop; n_dof_ = n_dof;
     };
     void operator()() {
-        one_case_loop(i_Vconv_, i_sigma_, i_loop_, n_dof_, *MBuild_, *Solver_, *Reader_, *IntegrateF_,* random_process_, *C_CSR_, *K_CSR_);
+        one_case_loop(i_Lnb_, i_Vconv_, i_sigma_, i_loop_, n_dof_, *MBuild_, *Solver_, *Reader_, *IntegrateF_,* random_process_, *C_CSR_, *K_CSR_);
     }
 };
 
@@ -382,8 +395,8 @@ int main() {
     std::random_device rd{};
     std::mt19937 gen{ rd() };
 
-    std::vector<std::vector<double>> random_process(num_loops*5, std::vector<double>(n_time));
-    for (int i_sigma = 0; i_sigma < 5; i_sigma++) {
+    std::vector<std::vector<double>> random_process(num_loops*2, std::vector<double>(n_time));
+    for (int i_sigma = 0; i_sigma < 2; i_sigma++) {
         double stand_dev = sigma_list[i_sigma] * std::sqrt(dt);
         std::normal_distribution<double> gauss{ 0, stand_dev };
         auto random_float = [&gen, &gauss] {return gauss(gen); };
@@ -450,13 +463,14 @@ int main() {
     auto SPtr_IntegrateF = std::make_shared<Volume_Vector_Integral3D>(IntegrateF);
     auto SPtr_random_process = std::make_shared<std::vector<std::vector<double>>>(random_process);
 
+    for (int i_Lnb = 0; i_Lnb < 3; i_Lnb++) {
+        for (int i_Vconv = 0; i_Vconv < 3; i_Vconv++) {
+            for (int i_sigma = 0; i_sigma < 2; i_sigma++) {
+                for (int i_loop = 0; i_loop < num_loops; i_loop++) {
 
-    for (int i_Vconv = 0; i_Vconv < 5; i_Vconv++) {
-        for (int i_sigma = 0; i_sigma < 5; i_sigma++) {
-            for (int i_loop = 0; i_loop < num_loops; i_loop++) {
-
-                // Full loop as a task to do in parallel
-                thr_pool.enqueue(Loop(SPtr_K_CSR, SPtr_C_CSR, SPtr_MBuild, SPtr_Solver, SPtr_Reader, SPtr_IntegrateF, SPtr_random_process, i_Vconv, i_sigma, i_loop, n_dof));
+                    // Full loop as a task to do in parallel
+                    thr_pool.enqueue(Loop(SPtr_K_CSR, SPtr_C_CSR, SPtr_MBuild, SPtr_Solver, SPtr_Reader, SPtr_IntegrateF, SPtr_random_process, i_Lnb, i_Vconv, i_sigma, i_loop, n_dof));
+                }
             }
         }
     }
