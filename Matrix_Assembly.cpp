@@ -23,6 +23,39 @@ void Matrix_Builder::build_matrix(Mesh& Reader, std::vector<std::vector<double>>
     }
 }
 
+void Matrix_Builder::build_matrix(Mesh& Reader, COOMatrix& A, Volume_Matrix_Integral& Integration, integrand_function f, double tol)
+{
+    assert(A.is_sym); // Check if A is built as a symmetric matrix
+
+    for (int c = 0; c < Reader.num_Elems["quad"]; c++) {
+        // Building vector of coordinates of element
+        vector<vector<double>> coords_element;
+        for (int k = 0; k < Reader.node_per_quad; k++) {
+            coords_element.push_back(Reader.Nodes[Reader.Elems["quad"][c].Nodes[k]]);
+        }
+
+        Shape_functions ShapeFcts;
+
+        // Assembling the stiffness matrix for element c
+        for (int i = 0; i < ShapeFcts.n_nodes; i++) {
+            for (int j = 0; j < ShapeFcts.n_nodes; j++) {
+                int index_i = Reader.Elems["quad"][c].Nodes[i];
+                int index_j = Reader.Elems["quad"][c].Nodes[j];
+                if (index_i >= index_j) {
+                    double value = Integration.Gaussian_Quadrature(i, j, coords_element, ShapeFcts, f);
+                    if (std::abs(value) > tol) {
+                        A.append(index_i, index_j, value);
+                    }
+                }
+            }
+        }
+        coords_element.clear();
+        /*if ((c + 1) % (Reader.num_Elems["hexa"] / report_steps) == 0) {
+            std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["hexa"] << endl;
+        }*/
+    }
+}
+
 void Matrix_Builder::build_matrix_boundary(Mesh& Reader, std::vector<std::vector<double>>& A, Boundary_Matrix_Integral& Integration, on_boundary on_bound)
 {
 
@@ -46,6 +79,28 @@ void Matrix_Builder::build_vector(Mesh& Reader, std::vector<double>& a, Volume_V
         if ((c + 1) % (Reader.num_Elems["quad"] / report_steps) == 0) {
             std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["quad"] << endl;
         }
+    }
+}
+
+void Matrix_Builder::build_vector(Mesh& Reader, DataVector& a, Volume_Vector_Integral& Integration, integrand_function f)
+{
+    for (int c = 0; c < Reader.num_Elems["quad"]; c++) {
+        // Building vector of coordinates of element
+        vector<vector<double>> coords_element;
+        for (int k = 0; k < Reader.node_per_quad; k++) {
+            coords_element.push_back(Reader.Nodes[Reader.Elems["quad"][c].Nodes[k]]);
+        }
+
+        Shape_functions ShapeFcts;
+
+        // Assembling the force vector for element c
+        for (int i = 0; i < ShapeFcts.n_nodes; i++) {
+            a[Reader.Elems["quad"][c].Nodes[i]] += Integration.Gaussian_Quadrature(i, coords_element, ShapeFcts, f);
+        }
+        coords_element.clear();
+        /*if ((c + 1) % (Reader.num_Elems["hexa"] / report_steps) == 0) {
+            std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["hexa"] << endl;
+        }*/
     }
 }
 
@@ -147,7 +202,59 @@ void Matrix_Builder::robin_BC(Mesh& Reader, std::vector<double>& f_vector, std::
     }
 }
 
+void Matrix_Builder::robin_BC(Mesh& Reader, DataVector& f_vector, COOMatrix& G_matrix, Boundary_Vector_Integral& Vect_integral, Boundary_Matrix_Integral& Mat_integral, boundary_integrand f_vect, boundary_integrand f_mat, on_boundary on_bound, std::vector<double>& params, double tol)
+{
+    assert(G_matrix.is_sym); // Check if A is built as a symmetric matrix
+    if (not G_matrix.is_sym) {
+        std::cout << "Issue G not symmetric" << std::endl;
+    }
+    //
+    // From the mesh, assemble the Robin boundary condition as the integral on the boundary elements of dimension N-1
+    // f_mat and f_vect are the integrand, respectively for the right-handside and left-handside terms
+    //
+    Shape_fct_1D ShapeFct1D;
+
+    for (int c = 0; c < Reader.num_Elems["line"]; c++) {
+        // If for selecting the boundary on which to apply the neumann BC
+        if (on_bound(Reader, c)) {
+            vector<vector<double>> coords_element;
+            for (int k = 0; k < ShapeFct1D.n_nodes; k++) {
+                coords_element.push_back(Reader.Nodes[Reader.Elems["line"][c].Nodes[k]]);
+            }
+            for (int i = 0; i < ShapeFct1D.n_nodes; i++) {
+                f_vector[Reader.Elems["line"][c].Nodes[i]] += Vect_integral.Gaussian_Quadrature(i, coords_element, ShapeFct1D, f_vect, params);
+            }
+
+
+            for (int i = 0; i < ShapeFct1D.n_nodes; i++) {
+                for (int j = 0; j < ShapeFct1D.n_nodes; j++) {
+                    int index_i = Reader.Elems["line"][c].Nodes[i];
+                    int index_j = Reader.Elems["line"][c].Nodes[j];
+                    if (index_i >= index_j) {
+                        double value = Mat_integral.Gaussian_Quadrature(i, j, coords_element, ShapeFct1D, f_mat, params);
+                        if (std::abs(value) > tol) {
+                            G_matrix.append(index_i, index_j, value);
+                        }
+                    }
+                }
+            }
+
+            coords_element.clear();
+        }
+        /*if ((c + 1) % (Reader.num_Elems["quad"] / report_steps) == 0) {
+            std::cout << "Progress : " << c + 1 << "/" << Reader.num_Elems["quad"] << endl;
+        }*/
+    }
+}
+
 void Matrix_Builder::build_initial_T(Mesh& Reader, std::vector<double>& vect_T0, initial_T0 T0_fct)
+{
+    for (int k = 0; k < Reader.num_nodes; k++) {
+        vect_T0[k] = T0_fct(Reader.Nodes[k]);
+    }
+}
+
+void Matrix_Builder::build_initial_T(Mesh& Reader, DataVector& vect_T0, initial_T0 T0_fct)
 {
     for (int k = 0; k < Reader.num_nodes; k++) {
         vect_T0[k] = T0_fct(Reader.Nodes[k]);

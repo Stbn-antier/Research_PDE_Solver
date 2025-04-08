@@ -23,6 +23,7 @@ public:
     int num_quad = 0;
     int shapefct_per_node = 4;
     int node_per_hexa = 8;
+    int node_per_quad = 4;
     void MeshReaderMSH(string filename);
     int FindBoundaryElementWithinMesh(Element elem, std::string search_type);
     int FindPositionOfBoundaryWithinElement(Element elem_boundary, Element elem_domain);

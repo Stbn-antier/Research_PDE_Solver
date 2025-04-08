@@ -8,10 +8,10 @@
 #include <format>
 #include "Mesh.h"
 #include "Shape_functions.h"
-#include "Shape_fct_3D.h"
+#include "Shape_fct_1D.h"
 #include "Solve_matrix_system.h"
-#include "Integrals_3D.h"
-#include "Matrix_Assembly_3D.h"
+#include "Integrals.h"
+#include "Matrix_Assembly.h"
 #include "Writer.h"
 #include "Matrix.h"
 #include "Thread_pool.h"
@@ -44,71 +44,69 @@ const double hfb = 100; // heat transfer with oil vapor
 //double hnb_list[3] = { 10000 , 15000 , 20000 };
 //double hfb_list[3] = { 50 , 100 , 150 };
 //double hconv_list[3] = { 365 , 730 , 1095 };
-//double Lnb_list[3] = { 0.005 , 0.01 , 0.015 };
-//double Vconv_list[3] = { 0.02 , 0.03 , 0.04 }; // Speed of the nucleation bubbling layer displacement
-//double sigma_list[2] = { 0.001 , 0.005 };
+double Lnb_list[3] = { 0.005 , 0.01 , 0.015 };
+double Vconv_list[5] = { 0.01 , 0.02 , 0.03 , 0.04 , 0.05 }; // Speed of the nucleation bubbling layer displacement
+double sigma_list[5] = { 0.001 , 0.002 , 0.003 , 0.004 , 0.005 };
 
 //const double stand_dev = 0.005; // Standard deviation of the gaussian distribution used
-const int num_loops = 25;
+const int num_loops = 100;
 
 //---------------------------------------------
 
-const double Lxmin = -0.0125;
+const double Lxmin = 0;
 const double Lxmax = 0.0125;
-const double Lymin = -0.0125;
-const double Lymax = 0.0125;
-const double Lzmin = 0;
-const double Lzmax = 0.1;
+const double Lymin = 0;
+const double Lymax = 0.1;
 
 //---------------------------------------------
 
 
-static double K_function(double x, double y, double z) {
+static double K_function(double x, double y) {
     // Function in the stiffness term
     return k_iso;
 }
 
-static double C_function(double x, double y, double z) {
+static double C_function(double x, double y) {
     return rho*Cp;
 }
 
-static double f_function(double x, double y, double z) {
+static double f_function(double x, double y) {
     // Source due to second derivative
     // !!! Program solves −𝛥T=f, need to put minus sign
     return 0;
 }
 
-static double h(double x, double y, double z, std::vector<double>& params) {
+static double h(double x, double y, std::vector<double>& params) {
     // Params vector stores information for planes at the boundary
-    // params[0] -> n1x, params[1] -> n1y, params[2] -> d1, params[3] -> n2x, params[4] -> n2y, params[5] -> d2
-    // params[6] -> hnb, params[7] -> hfb, params[8] -> hconv
-    double above1 = params[0] * x + params[1] * y + z - params[2];
-    double above2 = params[3] * x + params[4] * y + z - params[5];
+    // params[0] -> y_lconv, params[1] -> d_Lnb,
+    // params[2] -> hnb, params[3] -> hfb, params[4] -> hconv
+    double above1 = y - params[0];
+    double above2 = y - (params[0] + params[1]);
     // If above1>0, we are "above" plane 1, same for above2>0 and plane 2
 
     if (above1 <= 0 && above2 <= 0) {
-        return params[8];
+        return params[4];
     }
     else if (above1 > 0 && above2 > 0) {
-        return params[7];
+        return params[3];
     }
     else {
-        return params[6];
+        return params[2];
     }
 }
 
 // Boundary condition functions
 
-static double Neumann_insulation(double x, double y, double z, std::vector<double>& params) {
+static double Neumann_insulation(double x, double y, std::vector<double>& params) {
     return 0;
 }
 
-static double Robin_matrix(double x, double y, double z, std::vector<double>& params) {
-    return h(x,y,z,params);
+static double Robin_matrix(double x, double y, std::vector<double>& params) {
+    return h(x,y,params);
 }
 
-static double Robin_vector(double x, double y, double z, std::vector<double>& params) {
-    return h(x, y, z, params) * T_ext;
+static double Robin_vector(double x, double y, std::vector<double>& params) {
+    return h(x, y, params) * T_ext;
 }
 
 // Initial time function
@@ -121,83 +119,70 @@ static double T0(std::vector<double>& coordinates) {
 //---------------------------------------------
 // Functions defining where the boundaries are
 
-// Boundary for 2D elements
-static bool left_surf(Mesh& Reader, int index_quad) {
-    // Returns TRUE if the quad is on the left bound
+// Boundary for 1D elements
+static bool left_surf(Mesh& Reader, int index_line) {
+    // Returns TRUE if the line is on the left bound
     
     bool res = 1;
-    for (int i = 0; i < 4; i++) { //Iterate on nodes of quad element
-        res &= (Reader.Nodes[Reader.Elems["quad"][index_quad].Nodes[i]][0] < Lxmin + 1e-10);
+    for (int i = 0; i < 2; i++) { //Iterate on nodes of quad element
+        res &= (Reader.Nodes[Reader.Elems["line"][index_line].Nodes[i]][0] < Lxmin + 1e-10);
     }
     return res;
 }
 
-static bool right_surf(Mesh& Reader, int index_quad) {
+static bool right_surf(Mesh& Reader, int index_line) {
     bool res = 1;
-    for (int i = 0; i < 4; i++) { //Iterate on nodes of quad element
-        res &= (Reader.Nodes[Reader.Elems["quad"][index_quad].Nodes[i]][0] > Lxmax - 1e-10);
+    for (int i = 0; i < 2; i++) { //Iterate on nodes of quad element
+        res &= (Reader.Nodes[Reader.Elems["line"][index_line].Nodes[i]][0] > Lxmax - 1e-10);
     }
     return res;
 }
 
-static bool top_surf(Mesh& Reader, int index_quad) {
+static bool top_surf(Mesh& Reader, int index_line) {
     bool res = 1;
-    for (int i = 0; i < 4; i++) { //Iterate on nodes of quad element
-        res &= (Reader.Nodes[Reader.Elems["quad"][index_quad].Nodes[i]][2] > Lzmax - 1e-10);
+    for (int i = 0; i < 2; i++) { //Iterate on nodes of quad element
+        res &= (Reader.Nodes[Reader.Elems["line"][index_line].Nodes[i]][1] > Lymax - 1e-10);
     }
     return res;
 }
 
-static bool bottom_surf(Mesh& Reader, int index_quad) {
+static bool bottom_surf(Mesh& Reader, int index_line) {
     bool res = 1;
-    for (int i = 0; i < 4; i++) { //Iterate on nodes of quad element
-        res &= (Reader.Nodes[Reader.Elems["quad"][index_quad].Nodes[i]][2] < Lzmin + 1e-10);
+    for (int i = 0; i < 2; i++) { //Iterate on nodes of quad element
+        res &= (Reader.Nodes[Reader.Elems["line"][index_line].Nodes[i]][1] < Lymin + 1e-10);
     }
     return res;
 }
 
-static bool front_surf(Mesh& Reader, int index_quad) {
-    bool res = 1;
-    for (int i = 0; i < 4; i++) { //Iterate on nodes of quad element
-        res &= (Reader.Nodes[Reader.Elems["quad"][index_quad].Nodes[i]][1] > Lymax - 1e-10);
-    }
-    return res;
+static bool insulation_bound(Mesh& Reader, int index_line) {
+    return (left_surf(Reader, index_line));
 }
 
-static bool back_surf(Mesh& Reader, int index_quad) {
-    bool res = 1;
-    for (int i = 0; i < 4; i++) { //Iterate on nodes of quad element
-        res &= (Reader.Nodes[Reader.Elems["quad"][index_quad].Nodes[i]][1] < Lymin + 1e-10);
-    }
-    return res;
+static bool convection_bound(Mesh& Reader, int index_line) {
+    return (bottom_surf(Reader, index_line) || top_surf(Reader, index_line) || bottom_surf(Reader, index_line));
 }
 
-static bool insulation_bound(Mesh& Reader, int index_quad) {
-    return (top_surf(Reader, index_quad) || bottom_surf(Reader, index_quad) || front_surf(Reader, index_quad) || back_surf(Reader, index_quad));
-}
-
-static bool all_surf(Mesh& Reader, int index_quad) {
-    return (top_surf(Reader, index_quad) || bottom_surf(Reader, index_quad)\
-        || front_surf(Reader, index_quad) || back_surf(Reader, index_quad)\
-        || left_surf(Reader, index_quad) || right_surf(Reader, index_quad));
+static bool all_surf(Mesh& Reader, int index_line) {
+    return (top_surf(Reader, index_line) || bottom_surf(Reader, index_line)\
+        || left_surf(Reader, index_line) || right_surf(Reader, index_line));
 }
 
 // Boundary for Nodes
-static bool all_boundary(Mesh& Reader, int index_node) {
-    // Returns TRUE if the NODE at index index_node in on a boundary of the domain
-    return (\
-        Reader.Nodes[index_node][0] < Lxmin + 1e-10 || Reader.Nodes[index_node][0] > Lxmax - 1e-10 || \
-        Reader.Nodes[index_node][1] < Lymin + 1e-10 || Reader.Nodes[index_node][1] > Lymax - 1e-10 || \
-        Reader.Nodes[index_node][2] < Lzmin + 1e-10 || Reader.Nodes[index_node][2] > Lzmax - 1e-10);
-}
-
-static bool bottom(Mesh& Reader, int index_node) {
-    return (Reader.Nodes[index_node][2] < Lzmin + 1e-10);
-}
-
-static bool bottom_top(Mesh& Reader, int index_node) {
-    return (Reader.Nodes[index_node][2] < Lzmin + 1e-10 || Reader.Nodes[index_node][2] > Lzmax - 1e-10);
-}
+//static bool all_boundary(Mesh& Reader, int index_node) {
+//    // Returns TRUE if the NODE at index index_node in on a boundary of the domain
+//    return (\
+//        Reader.Nodes[index_node][0] < Lxmin + 1e-10 || Reader.Nodes[index_node][0] > Lxmax - 1e-10 || \
+//        Reader.Nodes[index_node][1] < Lymin + 1e-10 || Reader.Nodes[index_node][1] > Lymax - 1e-10 || \
+//        Reader.Nodes[index_node][2] < Lzmin + 1e-10 || Reader.Nodes[index_node][2] > Lzmax - 1e-10);
+//}
+//
+//static bool bottom(Mesh& Reader, int index_node) {
+//    return (Reader.Nodes[index_node][2] < Lzmin + 1e-10);
+//}
+//
+//static bool bottom_top(Mesh& Reader, int index_node) {
+//    return (Reader.Nodes[index_node][2] < Lzmin + 1e-10 || Reader.Nodes[index_node][2] > Lzmax - 1e-10);
+//}
 
 //---------------------------------------------
 
@@ -258,32 +243,32 @@ void store_2d_vector_in_file(std::string filename, vector<vector<double>>& array
     myfile.close();
 }
 
-void read_params_from_file(std::string name, std::vector<std::vector<double>>& params) {
-    std::ifstream myfile;
-    myfile.open(name);
-
-    std::string line;
-    while (getline(myfile, line)) {
-        double a; double b; double c;
-        istringstream iss(line);
-        iss >> a >> b >> c;
-        params.push_back(std::vector<double> { a, b, c });
-    }
-}
+//void read_params_from_file(std::string name, std::vector<std::vector<double>>& params) {
+//    std::ifstream myfile;
+//    myfile.open(name);
+//
+//    std::string line;
+//    while (getline(myfile, line)) {
+//        double a; double b; double c;
+//        istringstream iss(line);
+//        iss >> a >> b >> c;
+//        params.push_back(std::vector<double> { a, b, c });
+//    }
+//}
 
 //---------------------------------------------------------------
 
 
-void one_case_loop(int i_sobol, int i_loop, int n_dof, Matrix_Builder3D& MBuild, Solve_matrix_system& Solver,\
-    Mesh& Reader, Volume_Vector_Integral3D& IntegrateF, std::vector<std::vector<double>>& params_sobol, CSRMatrix& C_CSR, CSRMatrix& K_CSR) {
+void one_case_loop(int i_Lnb, int i_Vconv, int i_sigma, int i_loop, int n_dof, Matrix_Builder& MBuild, Solve_matrix_system& Solver,\
+    Mesh& Reader, Volume_Vector_Integral& IntegrateF, CSRMatrix& C_CSR, CSRMatrix& K_CSR) {
     
-    std::string path_storage = "results/loop_" + to_string(i_sobol * 25 + i_loop + 1) + "/";
+    std::string path_storage = "results/loop_" + to_string(i_Lnb * 2500 + i_Vconv * 500 + i_sigma * 100 + i_loop + 1) + "/";
     std::filesystem::create_directory(path_storage);
 
     // We set the parameters for now:
-    double Lnb = params_sobol[i_sobol][0];
-    double Vconv = params_sobol[i_sobol][1];
-    double sigma = params_sobol[i_sobol][2];
+    double Lnb = Lnb_list[i_Lnb];
+    double Vconv = Vconv_list[i_Vconv];
+    double sigma = sigma_list[i_sigma];
 
     // Generation of the gaussian vector of standard dev sigma (corrected by time)
     std::vector<double> random_process(n_time);
@@ -300,8 +285,8 @@ void one_case_loop(int i_sobol, int i_loop, int n_dof, Matrix_Builder3D& MBuild,
     DataVector dP_previous(n_dof);
 
     std::vector<double> T_C(n_time + 1); // Storing the values of temperature at center
-    //std::cout << Reader.Nodes[3381][0] << " " << Reader.Nodes[3381][1] << " " << Reader.Nodes[3381][2] << std::endl;
-    // for 10x10x40 mesh Center of sample is node 3381
+    //std::cout << Reader.Nodes[188][0] << " " << Reader.Nodes[188][1] << " " << Reader.Nodes[188][2] << std::endl;
+    // for 2D mesh Center of sample is node 188
 
     // Build force vector for timestep 0
     MBuild.build_vector(Reader, F, IntegrateF, f_function);
@@ -313,7 +298,7 @@ void one_case_loop(int i_sobol, int i_loop, int n_dof, Matrix_Builder3D& MBuild,
 
     // First, we calculate the initial condition at t=0
     MBuild.build_initial_T(Reader, dP_previous, T0);
-    T_C[0] = dP_previous[3381];
+    T_C[0] = dP_previous[188];
     store_1d_vector_in_binary_file(path_storage + "T0", dP_previous);
 
     std::vector<double> Lconv_vector(n_time + 1); // Storage for the realizations of random
@@ -324,7 +309,7 @@ void one_case_loop(int i_sobol, int i_loop, int n_dof, Matrix_Builder3D& MBuild,
         Lconv_vector[i + 1] = Lconv_vector[i] + dt * Vconv + gaussian_number;
 
         std::cout << "Thread number " << std::this_thread::get_id() << std::endl;
-        cout << "Loop number n=" + to_string(i_sobol * 25 + i_loop + 1) + "/32000, Timestep t = " << t << endl;
+        cout << "Loop number n=" + to_string(i_Lnb * 2500 + i_Vconv * 500 + i_sigma * 100 + i_loop + 1) + "/7500, Timestep t = " << t << endl;
         cout << "Params : Lnb = " << Lnb << ", Vconv = " << Vconv << ", sigma = " << sigma << endl;
 
         //std::cout << "Build force vector" << std::endl;
@@ -338,10 +323,10 @@ void one_case_loop(int i_sobol, int i_loop, int n_dof, Matrix_Builder3D& MBuild,
         // Robin BC
         //std::cout << "Robin BC " << std::endl;
         // Params vector stores information for planes at the boundary
-        // params[0] -> n1x, params[1] -> n1y, params[2] -> d1, params[3] -> n2x, params[4] -> n2y, params[5] -> d2, params[6] -> hnb, params[7] -> hfb, params[8] -> hconv
-        std::vector<double> params_robin = { 0, 0, Lconv_vector[i + 1], 0, 0 , Lconv_vector[i + 1] + Lnb, hnb, hfb, hconv };
-        Boundary_Vector_Integral3D Neumann_integrator;
-        Boundary_Matrix_Integral3D Robin_integrator;
+        // params[0] -> y_lconv, params[1] -> d_Lnb, params[2] -> hnb, params[3] -> hfb, params[4] -> hconv
+        std::vector<double> params_robin = { Lconv_vector[i + 1], Lnb, hnb, hfb, hconv };
+        Boundary_Vector_Integral Neumann_integrator;
+        Boundary_Matrix_Integral Robin_integrator;
         MBuild.robin_BC(Reader, b_vector, A_matrix, Neumann_integrator, Robin_integrator, \
             Robin_vector, Robin_matrix, all_surf, params_robin);
 
@@ -354,7 +339,7 @@ void one_case_loop(int i_sobol, int i_loop, int n_dof, Matrix_Builder3D& MBuild,
 
         // Store solution
         store_1d_vector_in_binary_file(path_storage + "T" + std::to_string(i + 1), dP);
-        T_C[i + 1] = dP[3381];
+        T_C[i + 1] = dP[188];
 
 
         dP_previous.swap(dP);
@@ -369,38 +354,38 @@ struct Loop {
 private:
     std::shared_ptr<CSRMatrix> K_CSR_;
     std::shared_ptr<CSRMatrix> C_CSR_;
-    std::shared_ptr<Matrix_Builder3D> MBuild_;
+    std::shared_ptr<Matrix_Builder> MBuild_;
     std::shared_ptr<Solve_matrix_system> Solver_;
     std::shared_ptr<Mesh> Reader_;
-    std::shared_ptr<Volume_Vector_Integral3D> IntegrateF_;
-    std::shared_ptr<std::vector<std::vector<double>>> params_sobol_;
+    std::shared_ptr<Volume_Vector_Integral> IntegrateF_;
+    //std::shared_ptr<std::vector<std::vector<double>>> params_sobol_;
 
-    int i_sobol_; int i_loop_; int n_dof_;
+    int i_Lnb_; int i_Vconv_; int i_sigma_; int i_loop_; int n_dof_;
 
 public:
     Loop(std::shared_ptr<CSRMatrix> K_CSR,
         std::shared_ptr<CSRMatrix> C_CSR,
-        std::shared_ptr<Matrix_Builder3D> MBuild,
+        std::shared_ptr<Matrix_Builder> MBuild,
         std::shared_ptr<Solve_matrix_system> Solver,
         std::shared_ptr<Mesh> Reader,
-        std::shared_ptr<Volume_Vector_Integral3D> IntegrateF,
-        std::shared_ptr<std::vector<std::vector<double>>> params_sobol,
-        int i_sobol, int i_loop, int n_dof) : \
-        K_CSR_(K_CSR), C_CSR_(C_CSR), MBuild_(MBuild), Solver_(Solver), Reader_(Reader), IntegrateF_(IntegrateF), params_sobol_(params_sobol) {
-        i_sobol_ = i_sobol; i_loop_ = i_loop; n_dof_ = n_dof;
+        std::shared_ptr<Volume_Vector_Integral> IntegrateF,
+        //std::shared_ptr<std::vector<std::vector<double>>> params_sobol,
+        int i_Lnb, int i_Vconv, int i_sigma, int i_loop, int n_dof) : \
+        K_CSR_(K_CSR), C_CSR_(C_CSR), MBuild_(MBuild), Solver_(Solver), Reader_(Reader), IntegrateF_(IntegrateF) {
+        i_Lnb_ = i_Lnb; i_Vconv_ = i_Vconv; i_sigma_ = i_sigma; i_loop_ = i_loop; n_dof_ = n_dof;
     };
     void operator()() {
-        one_case_loop(i_sobol_, i_loop_, n_dof_, *MBuild_, *Solver_, *Reader_, *IntegrateF_,* params_sobol_, *C_CSR_, *K_CSR_);
+        one_case_loop(i_Lnb_, i_Vconv_, i_sigma_, i_loop_, n_dof_, *MBuild_, *Solver_, *Reader_, *IntegrateF_, *C_CSR_, *K_CSR_);
     }
 };
 
 int main() {
     // Read mesh in file, prepare result writer
     Mesh Reader;
-    Reader.MeshReaderMSH("Mesh/mesh_3d_quench.msh");
+    Reader.MeshReaderMSH("Mesh/mesh_rectangle_regular.msh");
 
     // Matrix incremental builder, and solver
-    Matrix_Builder3D MBuild;
+    Matrix_Builder MBuild;
     Solve_matrix_system Solver;
 
     // Check if version is right
@@ -411,17 +396,17 @@ int main() {
     //     cout << Reader.Nodes[i].get_x() << " " << Reader.Nodes[i].get_y() << " " << Reader.Nodes[i].get_z() << endl;
     // }
     // Check if elements are saved well
-    cout << "Number of elements : " << Reader.num_Elems["hexa"] << endl;
+    cout << "Number of elements : " << Reader.num_Elems["quad"] << endl;
     // for (int i=0; i<Reader.num_Elems["quad"]; i++){
     //     cout << Reader.Elems["quad"][i].Nodes[0] << " " << Reader.Elems["quad"][i].Nodes[1] << " " << Reader.Elems["quad"][i].Nodes[2] << " " << Reader.Elems["quad"][i].Nodes[3] << endl;
     // }
-    cout << "Number of boundary elements : " << Reader.num_Elems["quad"] << endl;
+    cout << "Number of boundary elements : " << Reader.num_Elems["line"] << endl;
 
     // Read parameters for Sobol simulation
-    std::vector<std::vector<double>> params_Sobol;
-    read_params_from_file("Mesh/parameters.txt", params_Sobol);
-    std::cout << "Number of Sobol samples : " << params_Sobol.size() << std::endl;
-    std::cout << "Total loops : " << params_Sobol.size() * num_loops << std::endl;
+    //std::vector<std::vector<double>> params_Sobol;
+    //read_params_from_file("Mesh/parameters.txt", params_Sobol);
+    //std::cout << "Number of Sobol samples : " << params_Sobol.size() << std::endl;
+    //std::cout << "Total loops : " << params_Sobol.size() * num_loops << std::endl;
     
     // Create vectors and matrices to hold data
     int n_dof = Reader.num_nodes;
@@ -430,14 +415,14 @@ int main() {
 
     // Building stiffness and damping matrices
     cout << "Building stiffness matrix" << endl;
-    Volume_Inner_grad_Integral3D IntegrateK;
+    Volume_Inner_grad_Integral IntegrateK;
     MBuild.build_matrix(Reader, K, IntegrateK, K_function);
 
     cout << "Computing damping matrix" << endl;
-    Volume_Matrix_Integral3D IntegrateC;
+    Volume_Matrix_Integral IntegrateC;
     MBuild.build_matrix(Reader, C, IntegrateC, C_function);
 
-    Volume_Vector_Integral3D IntegrateF;
+    Volume_Vector_Integral IntegrateF;
 
     // Make C and K into CSR Matrices
     CSRMatrix K_CSR(K);
@@ -450,17 +435,21 @@ int main() {
     // Share needed resources as shared pointers
     auto SPtr_K_CSR = std::make_shared<CSRMatrix>(K_CSR);
     auto SPtr_C_CSR = std::make_shared<CSRMatrix>(C_CSR);
-    auto SPtr_MBuild = std::make_shared<Matrix_Builder3D>(MBuild);
+    auto SPtr_MBuild = std::make_shared<Matrix_Builder>(MBuild);
     auto SPtr_Solver = std::make_shared<Solve_matrix_system>(Solver);
     auto SPtr_Reader = std::make_shared<Mesh>(Reader);
-    auto SPtr_IntegrateF = std::make_shared<Volume_Vector_Integral3D>(IntegrateF);
-    auto SPtr_params_Sobol = std::make_shared<std::vector<std::vector<double>>>(params_Sobol);
+    auto SPtr_IntegrateF = std::make_shared<Volume_Vector_Integral>(IntegrateF);
+    //auto SPtr_params_Sobol = std::make_shared<std::vector<std::vector<double>>>(params_Sobol);
 
-    for (int i_sobol = 0; i_sobol < params_Sobol.size(); i_sobol++) {
-        for (int i_loop = 0; i_loop < num_loops; i_loop++) {
+    for (int i_Lnb = 0; i_Lnb < std::size(Lnb_list); i_Lnb++) {
+        for (int i_Vconv = 0; i_Vconv < std::size(Vconv_list); i_Vconv++) {
+            for (int i_sigma = 0; i_sigma < std::size(sigma_list); i_sigma++) {
+                for (int i_loop = 0; i_loop < num_loops; i_loop++) {
 
-            // Full loop as a task to do in parallel
-            thr_pool.enqueue(Loop(SPtr_K_CSR, SPtr_C_CSR, SPtr_MBuild, SPtr_Solver, SPtr_Reader, SPtr_IntegrateF, SPtr_params_Sobol, i_sobol, i_loop, n_dof));
+                    // Full loop as a task to do in parallel
+                    thr_pool.enqueue(Loop(SPtr_K_CSR, SPtr_C_CSR, SPtr_MBuild, SPtr_Solver, SPtr_Reader, SPtr_IntegrateF, i_Lnb, i_Vconv, i_sigma, i_loop, n_dof));
+                }
+            }
         }
     }
 

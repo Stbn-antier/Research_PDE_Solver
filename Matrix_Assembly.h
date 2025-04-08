@@ -4,6 +4,7 @@
 #include "Integrals.h"
 #include "Mesh.h"
 #include "Aliases.h"
+#include "Matrix.h"
 
 class Matrix_Builder
 {
@@ -11,10 +12,14 @@ private:
 	int report_steps = 1; // Report progress at every 1/report_step % of progress
 public:
 	void build_matrix(Mesh& Reader, std::vector<std::vector<double>>& A, Volume_Matrix_Integral& Integration, integrand_function f);
+
+	void build_matrix(Mesh& Reader, COOMatrix& A, Volume_Matrix_Integral& Integration, integrand_function f, double tol = 1e-16);
 	
 	void build_matrix_boundary(Mesh& Reader, std::vector<std::vector<double>>& A, Boundary_Matrix_Integral& Integration, on_boundary on_bound);
 	
 	void build_vector(Mesh& Reader, std::vector<double>& a, Volume_Vector_Integral& Integration, integrand_function f);
+
+	void build_vector(Mesh& Reader, DataVector& a, Volume_Vector_Integral& Integration, integrand_function f);
 	
 	void build_vector(Mesh& Reader, std::vector<double>& a, Boundary_Vector_Integral& Integration, on_boundary on_bound);
 
@@ -28,7 +33,13 @@ public:
 		Boundary_Vector_Integral Vect_integral,	Boundary_Matrix_Integral Mat_integral, \
 		boundary_integrand f_vect, boundary_integrand f_mat, on_boundary on_bound, std::vector<double>& params);
 
+	void robin_BC(Mesh& Reader, DataVector& f_vector, COOMatrix& G_matrix, \
+		Boundary_Vector_Integral& Vect_integral, Boundary_Matrix_Integral& Mat_integral, \
+		boundary_integrand f_vect, boundary_integrand f_mat, on_boundary on_bound, std::vector<double>& params, double tol = 1e-16);
+
 	void build_initial_T(Mesh& Reader, std::vector<double>& vect_T0, initial_T0 T0_fct);
+
+	void build_initial_T(Mesh& Reader, DataVector& vect_T0, initial_T0 T0_fct);
 
 	void build_A_matrix();
 
